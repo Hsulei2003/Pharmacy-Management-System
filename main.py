@@ -5,6 +5,7 @@ from add_medicine import add_page
 from scan_sell import scan_page
 from medicine_list import list_page
 from add_category import add_category_page
+from add_supplier import add_supplier_page
 from login import LoginWindow
 
 create_table()
@@ -84,14 +85,18 @@ def show_main_window():
     btn_dashboard = create_sidebar_btn("📦", "Category Setup", lambda: add_category_page(main))
     btn_dashboard.pack(pady=8, fill="x", padx=10, ipady=6)
 
+    btn_supplier = create_sidebar_btn("🏢", "Supplier Setup", lambda: add_supplier_page(main))
+    btn_supplier.pack(pady=8, fill="x", padx=10, ipady=6)
+
     btn_add = create_sidebar_btn("➕", "Add Medicine", lambda: add_page(main))
     btn_add.pack(pady=8, fill="x", padx=10, ipady=6)
+
+    btn_list = create_sidebar_btn("📋", "Medicine List", lambda: list_page(main))
+    btn_list.pack(pady=8, fill="x", padx=10, ipady=6)
 
     btn_scan = create_sidebar_btn("🛍", "Scan & Sell", lambda: scan_page(main))
     btn_scan.pack(pady=8, fill="x", padx=10, ipady=6)
 
-    btn_list = create_sidebar_btn("📋", "Medicine List", lambda: list_page(main))
-    btn_list.pack(pady=8, fill="x", padx=10, ipady=6)
     # Sidebar ရဲ့ အောက်ခြေအဆုံးတွင် ပေါ်မည့် Log Out ခလုတ်လေး
     logout_btn = tk.Button(
         sidebar, 

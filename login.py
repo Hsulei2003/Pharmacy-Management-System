@@ -38,7 +38,7 @@ class LoginWindow:
             bg="white",
             highlightthickness=0
         )
-        self.username_entry.pack(fill="x", pady=(5, 15), ipady=6) # ipady က entry ဗူးကို ပိုမိုအမြင့်ကြီးစေပါတယ်
+        self.username_entry.pack(fill="x", pady=(5, 15), ipady=6) # ipady က entry boxကို ပိုမိုအမြင့်ကြီးစေပါတယ်
         self.username_entry.focus()
 
         # Password Field

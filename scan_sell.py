@@ -12,7 +12,7 @@ def scan_page(main):
     # ခေါင်းစဉ်
     tk.Label(
         main, 
-        text="Scan & Sell Medicines", 
+        text="Scan & Sell Medicines (Batch System)", 
         font=("Segoe UI", 22, "bold"), 
         fg="#2c3e50", 
         bg="#f8f9fa"
@@ -58,34 +58,24 @@ def scan_page(main):
     qty_entry.insert(0, "1")
     sell_card.create_window(175, 130, window=qty_entry, anchor="w")
 
-   # Row 2: Result Area (Grid စနစ်သုံးပြီး အလယ်တည့်တည့် ရောက်အောင် ညှိခြင်း)
-    # =================================================================
+    # Row 2: Result Area
     result_frame = tk.Frame(sell_card, bg="#f8f9fa", relief="solid", bd=1)
     sell_card.create_window(270, 210, window=result_frame, anchor="center", width=470, height=60)
 
-    # 🌟 Frame တစ်ခုလုံးရဲ့ အလယ်မှာ ပေါ်စေဖို Grid Row/Column ကို Weight ပေးခြင်း
     result_frame.grid_columnconfigure(0, weight=1)
     result_frame.grid_columnconfigure(3, weight=1)
     result_frame.grid_rowconfigure(0, weight=1)
 
-    # ၁။ ရှေ့က Icon ပြမည့် Label (font size ကို အချိုးကျအောင် ၁၄ လောက်ပဲ ထားပါမယ်)
-    icon_label = tk.Label(
-        result_frame, 
-        text="🔍", 
-        font=("Segoe UI", 14), 
-        fg="#7f8c8d", 
-        bg="#f8f9fa"
-    )
+    icon_label = tk.Label(result_frame, text="🔍", font=("Segoe UI", 14), fg="#7f8c8d", bg="#f8f9fa")
     icon_label.grid(row=0, column=1, padx=(0, 8), sticky="nsew") 
 
-    # ၂။ စာသားသီးသန့်ပြမည့် Label (anchor="center" ပြောင်းပြီး အလယ်ပိုလိုက်ပါတယ်)
     result = tk.Label(
         result_frame, 
         text="Please scan a medicine barcode...", 
         font=("Segoe UI", 11, "italic"), 
         fg="#7f8c8d", 
         bg="#f8f9fa",
-        anchor="center" # 👈 ဘယ်ဘက်မကပ်တော့ဘဲ အလယ်မှာပဲ နေခိုင်းခြင်း
+        anchor="center"
     )
     result.grid(row=0, column=2, padx=(0, 0), sticky="nsew")
 
@@ -93,81 +83,88 @@ def scan_page(main):
     scanned_barcode = tk.StringVar()
 
     # =================================================================
-    # --- Scan စစ်ဆေးသည့် Logic (Database မှ ဒေတာဆွဲထုတ်ခြင်း) ---
+    # --- 🛠️ Scan စစ်ဆေးသည့် Logic (Expired ဖြစ်နေသော Batch များကို ကျော်၍ တွက်ခြင်း) ---
     # =================================================================
     def check_barcode_data(code):
         if not code:
             return
 
         try:
+            import datetime
+            current_date = datetime.date.today().strftime("%Y-%m-%d")
+            
             conn = db()
             c = conn.cursor()
-            c.execute("SELECT name, barcode, qty, expiry FROM medicines WHERE barcode=?", (code,))
-            data = c.fetchone()
+            
+            # 🌟 သက်တမ်းမကုန်သေးဘဲ စတော့ကျန်ရှိနေသော Batch များ၏ စုစုပေါင်းနှင့် အနီးစပ်ဆုံးရက် (Nearest Exp) ကို တွက်ခြင်း
+            c.execute("""
+                SELECT m.name, m.barcode, SUM(b.qty), MIN(b.expiry)
+                FROM medicines m
+                LEFT JOIN medicine_batches b ON m.id = b.medicine_id
+                WHERE m.barcode=? AND b.qty > 0 AND b.expiry >= ?
+                GROUP BY m.id
+            """, (code, current_date))
+            active_data = c.fetchone()
+            
+            # 🌟 ဆေးရှိသော်လည်း သက်တမ်းကုန်နေသည်များကို စစ်ရန် ဆေးအချက်အလက်ကို သီးသန့်ပြန်ရှာခြင်း
+            c.execute("SELECT name, barcode FROM medicines WHERE barcode=?", (code,))
+            med_info = c.fetchone()
             conn.close()
             
-            if data:
-                name, barcode, qty, expiry = data
+            if active_data and active_data[0] is not None:
+                # 👍 သက်တမ်းမကုန်သေးသည့် စတော့ကျန်ရှိသော ဘတ်ချ် ရှိနေပါက ရောင်းခွင့်ပြုမည်
+                name, barcode, qty, expiry = active_data
                 status = get_status(expiry)
                 
                 scanned_barcode.set(barcode)
-                if qty <= 0:
-                    text_color = "#e74c3c"       
-                elif status == "Normal":
-                    text_color = "#27ae60"       
-                elif status == "Near Expiry":
-                    text_color = "#e67e22"       
-                else:
-                    text_color = "#c0392b"       
+                text_color = "#27ae60" if status == "Normal" else "#e67e22"       
 
                 icon_label.config(text="💊", font=("Segoe UI", 11), fg=text_color)
                 result.config(
-                    text=f"{name}  |  Stock: {qty}  |  {status}",
-                    font=("Segoe UI", 13, "bold"),
+                    text=f"{name}  |  Available Stock: {qty}  |  Nearest Exp: {expiry}",
+                    font=("Segoe UI", 12, "bold"),
                     fg=text_color
                 )
-
-              # 🌟 [Expired သိုမဟုတ် Out of Stock ဖြစ်လျှင် မြည်မည့်အသံ]
-                if status == "Expired" or qty <= 0:
-                    import time
-                    import threading
-                    from pygame import mixer
-
-                    def play_perfect_beeps():
-                        mixer.init()
-                        sound = mixer.Sound("warning.mp3") 
-                        sound.play()
-                    threading.Thread(target=play_perfect_beeps, daemon=True).start()
-
-                    sell_btn.config(state="disabled", bg="#95a5a6")
-                    if qty <= 0:
-                        icon_label.config(text="❌", font=("Segoe UI", 20), fg="#c0392b")
-                        result.config(text=f"{name} is Out of Stock!", font=("Segoe UI", 11, "bold"), fg="#c0392b", anchor="center")
-                else:
-                    sell_btn.config(state="normal", bg="#e74c3c") 
-            else:
-                scanned_barcode.set("")
+                sell_btn.config(state="normal", bg="#e74c3c") # 🔓 အရောင်းခလုတ်ကို ဖွင့်ပေးမည်
                 
-                # 🌟 [ဆေးဝါးရှာမတွေ့ပါက မြည်မည့်အသံ]
+            elif med_info:
+                # ⚠️ ဆေးရှိသော်လည်း ရှိသမျှ Batch အားလုံး သက်တမ်းကုန်နေပြီ သိုမဟုတ် စတော့ကုန်နေပြီ
+                name, barcode = med_info
+                scanned_barcode.set(barcode)
+                
+                # Warning အသံမြည်အောင်လုပ်ခြင်း
                 import threading
                 from pygame import mixer
+                def play_warning():
+                    try:
+                        mixer.init()
+                        sound = mixer.Sound("warning_short.mp3") 
+                        sound.play()
+                    except: pass
+                threading.Thread(target=play_warning, daemon=True).start()
 
-                def play_not_found_beeps():
-                    mixer.init()
-                    sound = mixer.Sound("error.mp3")
-                    sound.play() 
-                threading.Thread(target=play_not_found_beeps, daemon=True).start()
-                
+                icon_label.config(text="❌", font=("Segoe UI", 20), fg="#c0392b")
+                result.config(
+                    text=f"{name} is Expired or Out of Active Stock!", 
+                    font=("Segoe UI", 11, "bold"), 
+                    fg="#c0392b", 
+                    anchor="center"
+                )
+                sell_btn.config(state="disabled", bg="#95a5a6") # 🔒 ခလုတ်ပိတ်ထားမည်
+            else:
+                # ဆေးဝါး လုံးဝ ရှာမတွေ့ပါက
+                scanned_barcode.set("")
                 icon_label.config(text="❌", font=("Segoe UI", 20), fg="#c0392b")
                 result.config(text=" Medicine Not Found!", font=("Segoe UI", 11, "bold"), fg="#c0392b", anchor="center")
                 sell_btn.config(state="disabled", bg="#95a5a6")
+                
         except Exception as e:
             messagebox.showerror("Scan Error", f"Something went wrong while scanning:\n{e}")
 
     # Text Box ထဲ စာရိုက်ပြီး Enter ခေါက်လျှင် ချက်ချင်းစစ်ဆေးပေးမည့် စနစ်
     scan_entry.bind("<Return>", lambda e: check_barcode_data(scan_entry.get().strip()))
 
-    # --- Webcam ဖွင့်ပြီး စကင်ဖတ်မည့် အစိတ်အပိုင်းသစ် ---
+    # --- Webcam ဖွင့်ပြီး စကင်ဖတ်မည့် အစိတ်အပိုင်း ---
     def trigger_scan():
         import cv2
         from scanner import BarcodeScanner
@@ -177,11 +174,11 @@ def scan_page(main):
         scanner = BarcodeScanner()
         cap = cv2.VideoCapture(0)
         scanned_code = None
+        window_name = "Quick Check Barcode (Press 'q' to Exit)"
         
         while True:
             ret, frame = cap.read()
-            if not ret:
-                break
+            if not ret: break
                 
             frame = cv2.flip(frame, 1) 
             res = scanner.scan_from_frame(frame)
@@ -189,13 +186,15 @@ def scan_page(main):
                 scanned_code = res
                 break
                 
-            cv2.imshow("Scan Medicine Barcode (Press 'q' to Exit)", frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+            cv2.imshow(window_name, frame)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'): break
+            try:
+                if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1: break
+            except: break
                 
         cap.release()
         cv2.destroyAllWindows()
-        
         scan_btn.config(state="normal")
 
         if scanned_code:
@@ -206,7 +205,9 @@ def scan_page(main):
             icon_label.config(text="❌", font=("Segoe UI", 24), fg="#e67e22")
             result.config(text="Scan cancelled or no barcode detected.", font=("Segoe UI", 11, "bold"), fg="#e67e22")
 
-    # --- အရောင်းသိမ်းဆည်းပြီး Stock လျှော့ချမည့် Logic ---
+    # =================================================================
+    # --- 🛠️ အရောင်းသိမ်းဆည်းပြီး FIFO စနစ်ဖြင့် စတော့လျှော့ချမည့် Logic ---
+    # =================================================================
     def sell():
         code_to_sell = scanned_barcode.get()
         if not code_to_sell:
@@ -227,41 +228,85 @@ def scan_page(main):
             return
 
         try:
+            import datetime
+            current_date = datetime.date.today().strftime("%Y-%m-%d")
+            
             conn = db()
             c = conn.cursor()
-            c.execute("SELECT name, qty FROM medicines WHERE barcode=?", (code_to_sell,))
+            
+            # ၁။ ဆေး၏ သက်တမ်းမကုန်သေးသော (Active) စတော့ကျန်ရှိမှုကို စစ်ဆေးခြင်း
+            c.execute("""
+                SELECT m.id, m.name, SUM(b.qty) 
+                FROM medicines m
+                JOIN medicine_batches b ON m.id = b.medicine_id
+                WHERE m.barcode = ? AND b.qty > 0 AND b.expiry >= ?
+                GROUP BY m.id
+            """, (code_to_sell, current_date))
             row = c.fetchone()
             
             if not row:
                 icon_label.config(text="❌", font=("Segoe UI", 24), fg="#c0392b")
-                result.config(text="Medicine no longer exists!", font=("Segoe UI", 11, "bold"), fg="#c0392b")
+                result.config(text="No active stock available to sell!", font=("Segoe UI", 11, "bold"), fg="#c0392b")
                 conn.close()
-                sell_btn.config(state="disabled", bg="#95a5a6")
                 return
             
-            name, available_qty = row
+            med_id, name, total_available = row
 
-            if available_qty >= sell_qty:
-                new_qty = available_qty - sell_qty
-                
-                c.execute("UPDATE medicines SET qty=? WHERE barcode=?", (new_qty, code_to_sell))
-                conn.commit()
-                conn.close()
-                
-                messagebox.showinfo("Success", f"Successfully sold {sell_qty} {name}!\nRemaining Stock: {new_qty}")
-                
-                scan_entry.delete(0, tk.END)
-                qty_entry.delete(0, tk.END)
-                qty_entry.insert(0, "1")
-                scanned_barcode.set("")
-                
-                icon_label.config(text="🔍", font=("Segoe UI", 11), fg="#7f8c8d")
-                result.config(text="Transaction complete. Waiting for next scan...", font=("Segoe UI", 11, "italic"), fg="#7f8c8d")
-                sell_btn.config(state="disabled", bg="#95a5a6")
-            else:
+            if total_available < sell_qty:
                 icon_label.config(text="❌", font=("Segoe UI", 20), fg="#c0392b")
-                result.config(text=f"Not enough stock! Only {available_qty} items left.", font=("Segoe UI", 11, "bold"), fg="#c0392b")
+                result.config(text=f"Not enough active stock! Only {total_available} items left.", font=("Segoe UI", 11, "bold"), fg="#c0392b")
                 conn.close()
+                return
+
+            # ၂။ 🌟 FIFO (First Expired, First Out) အရောင်းစနစ် - သက်တမ်းမကုန်သေးသော ဘတ်ချ်များကိုသာ နှုတ်မည် 🌟
+            c.execute("""
+                SELECT qty, batch_number FROM medicine_batches 
+                WHERE medicine_id = ? AND qty > 0 AND expiry >= ?
+                ORDER BY expiry ASC
+            """, (med_id, current_date))
+            batches = c.fetchall()
+            
+            remaining_to_sell = sell_qty
+            
+            for batch in batches:
+                batch_qty, batch_no = batch
+                
+                if remaining_to_sell <= 0:
+                    break
+                
+                if batch_qty >= remaining_to_sell:
+                    # လက်ရှိ Batch ထဲကတင် လုံလောက်လျှင် နှုတ်ပြီး Loop ပိတ်မည်
+                    new_batch_qty = batch_qty - remaining_to_sell
+                    c.execute("""
+                        UPDATE medicine_batches 
+                        SET qty = ? 
+                        WHERE medicine_id = ? AND batch_number = ?
+                    """, (new_batch_qty, med_id, batch_no))
+                    remaining_to_sell = 0
+                else:
+                    # လက်ရှိ Batch က မလောက်လျှင် 0 လုပ်ပြီး နောက်ထပ် Batch ဆီ ဆက်သွားမည်
+                    remaining_to_sell -= batch_qty
+                    c.execute("""
+                        UPDATE medicine_batches 
+                        SET qty = 0 
+                        WHERE medicine_id = ? AND batch_number = ?
+                    """, (med_id, batch_no))
+
+            conn.commit()
+            conn.close()
+            
+            # အောင်မြင်ကြောင်း ပြသခြင်း
+            messagebox.showinfo("Success", f"Successfully sold {sell_qty} {name}!\nStock deducted from oldest active batch.")
+            
+            # UI ပြန်လည်ရှင်းလင်းခြင်း
+            scan_entry.delete(0, tk.END)
+            qty_entry.delete(0, tk.END)
+            qty_entry.insert(0, "1")
+            scanned_barcode.set("")
+            
+            icon_label.config(text="🔍", font=("Segoe UI", 11), fg="#7f8c8d")
+            result.config(text="Transaction complete. Waiting for next scan...", font=("Segoe UI", 11, "italic"), fg="#7f8c8d")
+            sell_btn.config(state="disabled", bg="#95a5a6")
                 
         except Exception as e:
             messagebox.showerror("Database Error", f"Failed to update stock in database:\n{e}")
@@ -278,7 +323,6 @@ def scan_page(main):
         cursor="hand2",
         padx=12
     )
-    sell_card.create_width = 395
     sell_card.create_window(395, 80, window=scan_btn, anchor="w")
     
     # Sell Button ကို နေရာချခြင်း

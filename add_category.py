@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from database import db
+import sqlite3
 from utils import clear
 
 def add_category_page(main):
@@ -8,22 +9,9 @@ def add_category_page(main):
     clear(main)
     main.config(bg="#f8f9fa")
 
-    # ဒေတာဘေ့စ်ထဲမှာ categories table မရှိသေးရင် ဆောက်ရန်
-    conn = db()
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            cat_name TEXT NOT NULL UNIQUE
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-    # ขေါင်းစဉ်ကြီး
     tk.Label(
         main, 
-        text="📁 Category Management", 
+        text="📁 Category Setup", 
         font=("Segoe UI", 22, "bold"), 
         fg="#2c3e50", 
         bg="#f8f9fa"
@@ -82,8 +70,8 @@ def add_category_page(main):
     # Treeview Style မြှင့်တင်ထားခြင်း
     cat_style = ttk.Style()
     cat_style.theme_use("clam")
-    cat_style.configure("Cat.Treeview", font=("Segoe UI", 10), rowheight=28, background="white")
-    cat_style.configure("Cat.Treeview.Heading", font=("Segoe UI", 11, "bold"), background="#34495e", foreground="white")
+    cat_style.configure("Cat.Treeview", font=("Segoe UI", 12), rowheight=30, background="white")
+    cat_style.configure("Cat.Treeview.Heading", font=("Segoe UI", 13, "bold"), background="#34495e", foreground="white")
     cat_style.map("Cat.Treeview", background=[("selected", "#1abc9c")])
 
     tree = ttk.Treeview(
@@ -98,7 +86,7 @@ def add_category_page(main):
     tree.heading("id", text="No.", anchor="center")
     tree.heading("name", text="Category Name", anchor="center")
     tree.column("id", width=80, anchor="center")
-    tree.column("name", width=260, anchor="w")
+    tree.column("name", width=260, anchor="center")
     tree.pack(fill="both", expand=True)
 
 
@@ -111,17 +99,18 @@ def add_category_page(main):
         for item in tree.get_children():
             tree.delete(item)
         
-        conn = db()
-        c = conn.cursor()
-        c.execute("SELECT cat_name FROM categories ORDER BY cat_name ASC")
-        rows = c.fetchall()
-        conn.close()
+        with db() as conn:
+            c = conn.cursor()
+            c.execute("SELECT cat_name FROM categories ORDER BY cat_name ASC")
+            rows = c.fetchall()
+            
 
         for idx, row in enumerate(rows, 1):
             tree.insert("", "end", values=(idx, row[0]))
-            # 💾 Category အသစ်ထည့်မည့် လုပ်ဆောင်ချက်
+
+    # 💾 Category အသစ်ထည့်မည့် လုပ်ဆောင်ချက်
     def save_category():
-        cat_name = cat_entry.get().strip()
+        cat_name = cat_entry.get().strip().capitalize()
         if not cat_name:
             messagebox.showwarning("Warning", "Please enter a category name!")
             return
@@ -137,7 +126,7 @@ def add_category_page(main):
             cat_entry.delete(0, tk.END)
             load_categories()
             
-        except db.IntegrityError:  # sqlite3 သိုမဟုတ် db error စစ်ဆေးခြင်း
+        except sqlite3.IntegrityError:  # sqlite3 သိုမဟုတ် db error စစ်ဆေးခြင်း
             messagebox.showerror("Error", "This category already exists!")
 
     # 🗑 Treeview ထဲက ရွေးထားတဲ့ Category ကို ဖျက်မည့် Function
@@ -162,10 +151,6 @@ def add_category_page(main):
             messagebox.showinfo("Deleted", f"Category '{cat_name_to_delete}' deleted successfully!")
             load_categories()
 
-
-    # =================================================================
-    # 🔘 BUTTONS CREATION (Function များအောက်သို ရွှေ့လိုက်သဖြင့် Error မတက်တော့ပါ)
-    # =================================================================
     
     # ➕ ညာဘက်ခြမ်းအတွက် Delete Selected Button
     tk.Button(

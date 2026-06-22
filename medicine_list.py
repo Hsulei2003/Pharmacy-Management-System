@@ -1,121 +1,200 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from database import db
-from logic import get_status
+import datetime
+from database import db # မင်းရဲ့ ဒေတာဘေ့စ် ချိတ်ဆက်မှုဖိုင်
 from utils import clear
-from logic import get_all_categories
+
+# 🌟 logic.py ထဲမှ ပြင်ဆင်ထားသော Batch စနစ်သုံး Functions များကို လှမ်းယူခြင်း
+from logic import get_status, get_all_categories, get_all_suppliers, get_medicines_list_details, delete_medicine_from_db
+
+# =================================================================
+# 🛠️ သက်တမ်းကုန်ဆေးများကို စတော့ခ် 0 ပြောင်းလဲပြီး ရှင်းထုတ်မည့် Logic
+# =================================================================
+def clear_expired_stock_update(refresh_callback):
+    current_date = datetime.date.today().strftime("%Y-%m-%d")
+    
+    # ဆိုင်ရှင်ကို အတည်ပြုချက် တောင်းခြင်း (မတော်တဆ နှိပ်မိခြင်းမှ ကာကွယ်ရန်)
+    confirm = messagebox.askyesno(
+        "Confirm Action", 
+        "Are you sure you want to set Qty to 0 for all expired medicine batches?"
+    )
+    if not confirm:
+        return
+        
+    conn = None
+    try:
+        conn = db()
+        c = conn.cursor()
+        
+        # 🌟 သက်တမ်းကုန်ပြီး စတော့ကျန်နေသေးသည့် Batch များကို Qty = 0 ပြောင်းလဲခြင်း
+        c.execute("""
+            UPDATE medicine_batches 
+            SET qty = 0 
+            WHERE expiry < ? AND qty > 0
+        """, (current_date,))
+        
+        row_count = c.rowcount # ပြင်ဆင်လိုက်ရသော Batch အရေအတွက်ကို မှတ်သားခြင်း
+        conn.commit()
+        
+        if row_count > 0:
+            messagebox.showinfo("Success", f"Successfully cleared {row_count} expired batches (Set Qty to 0).")
+            # 🔄 ဇယားကွက်ထဲတွင် စတော့ခ် 0 ဖြစ်သွားသည်ကို ချက်ချင်းမြင်ရအောင် ဇယားကို Refresh ပြန်လုပ်ခိုင်းခြင်း
+            refresh_callback() 
+        else:
+            messagebox.showinfo("Info", "No expired active stock found to clear.")
+            
+    except Exception as e:
+        messagebox.showerror("Database Error", f"Something went wrong while clearing stock:\n{e}")
+    finally:
+        # 🌟 သတိထားရန် - database locked အမှား ထပ်မတက်စေရန် connection ကို သေချာပြန်ပိတ်ခြင်း
+        if conn:
+            conn.close()
 
 # ---------- MEDICINE LIST PAGE ----------
 def list_page(main, focus_barcode=None):
-    # ၁။ Сာမျက်နှာအဟောင်းများကို အရင်ရှင်းထုတ်မည်
+    # ၁။ စာမျက်နှာအဟောင်းများကို အရင်ရှင်းထုတ်မည်
     clear(main)
     main.config(bg="#f8f9fa")
 
     # ခေါင်းစဉ်
     tk.Label(
         main, 
-        text="💊 Medicine Inventory List", 
+        text="💊 Medicine Stock Inventory (Batch System)", 
         font=("Segoe UI", 22, "bold"), 
         fg="#2c3e50", 
         bg="#f8f9fa"
     ).pack(pady=15)
 
-    # Search Frame (ရှာဖွေရန်နေရာ)
+    # 🌟 Search Frame
     search_frame = tk.Frame(main, bg="#f8f9fa")
     search_frame.pack(pady=5, fill="x", padx=20)
 
-    search_entry = tk.Entry(search_frame, font=("Segoe UI", 11), width=30, relief="solid", bd=1)
+    # 🔍 (က) Name Search အပိုင်း
+    tk.Label(search_frame, text="Search Name:", font=("Segoe UI", 10, "bold"), bg="#f8f9fa", fg="#34495e").pack(side="left", padx=(5, 2))
+    search_entry = tk.Entry(search_frame, font=("Segoe UI", 11), width=20, relief="solid", bd=1)
     search_entry.pack(side="left", padx=5, ipady=3)
+    
+    # Name အတွက် သီးသန့် Search ခလုတ်
+    def search_by_name():
+        load(search_text=search_entry.get().strip(), search_type="name")
+
+    tk.Button(search_frame, text="🔍 Search", font=("Segoe UI", 10, "bold"), bg="#3498db", fg="white", relief="flat", command=search_by_name).pack(side="left", padx=5)
+
+    # separator လေးတစ်ခု ခြားပေးခြင်း
+    tk.Label(search_frame, text=" | ", font=("Segoe UI", 11), bg="#f8f9fa", fg="#bdc3c7").pack(side="left", padx=10)
+
+    # 💊 (ခ) Category Filter Dropdown အပိုင်း
+    tk.Label(search_frame, text="Category:", font=("Segoe UI", 10, "bold"), bg="#f8f9fa", fg="#34495e").pack(side="left", padx=(2, 2))
+    
+    db_categories = get_all_categories()
+    if not db_categories:
+        db_categories = ["⚪️ Tablet", "💊 Capsule", "🧪 Syrup", "💉 Injection", "🧴 Ointment", "📦 Other"]
+    
+    cat_options = ["✨ All Categories"] + db_categories
+    
+    cat_search_combo = ttk.Combobox(search_frame, values=cat_options, font=("Segoe UI", 11), state="readonly", width=18)
+    cat_search_combo.current(0) 
+    cat_search_combo.pack(side="left", padx=5, ipady=1)
 
     # ဇယား (Treeview) အတွက် Style ပြင်ဆင်ခြင်း
     style = ttk.Style()
     style.theme_use("clam")
-    style.configure("Treeview", font=("Segoe UI", 10), rowheight=28, background="white")
-    style.configure("Treeview.Heading", font=("Segoe UI", 11, "bold"), background="#34495e", foreground="white")
-    style.map("Treeview", background=[("selected", "#1abc9c")]) # ရွေးလိုက်ရင် ပြာစိမ်းရောင်ပြောင်းမည်
+    style.configure("Treeview", font=("Segoe UI", 11), rowheight=30, background="white")
+    style.configure("Treeview.Heading", font=("Segoe UI", 11, "bold"), background="#2c3e50", foreground="white")
+    
+    # ရွေးချယ်ထားသော Row အား အရောင်သတ်မှတ်ခြင်း
+    style.map("Treeview", background=[("selected", "#3498db")])
 
     # Table Container Frame
-    table_frame = tk.Frame(main)
+    table_frame = tk.Frame(main, bg="white", relief="solid", bd=1)
     table_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
-    # Scrollbar ထည့်သွင်းခြင်း
     scrollbar = ttk.Scrollbar(table_frame)
     scrollbar.pack(side="right", fill="y")
 
-    # Treeview ဇယားဆောက်ခြင်း
-    columns = ("name", "barcode", "category", "qty", "expiry", "status")
-    tree = ttk.Treeview(table_frame, columns=columns, show="headings", yscrollcommand=scrollbar.set)
+    # 🌟 ကော်လံများတည်ဆောက်မှု (ID အား ရှေ့ဆုံးမှ ဝှက်၍ ထည့်သွင်းထားပါသည်)
+    columns = ("id", "name", "barcode", "category", "qty", "expiry", "supplier", "status")
+    tree = ttk.Treeview(table_frame, columns=columns, show="headings", yscrollcommand=scrollbar.set, style="Treeview")
     scrollbar.config(command=tree.yview)
 
-    # Column ခေါင်းစဉ်များနှင့် အကျယ် သတ်မှတ်ခြင်း
-    headers = {
-        "name": "Medicine Name", "barcode": "Barcode", "category": "Category",
-        "qty": "Quantity", "expiry": "Expiry Date", "status": "Status"
-    }
-    for col, text in headers.items():
-        tree.heading(col, text=text, anchor="center")
+    # ခေါင်းစဉ်များ သတ်မှတ်ခြင်း
+    tree.heading("id", text="")
+    tree.heading("name", text="Medicine Name")
+    tree.heading("barcode", text="Barcode")
+    tree.heading("category", text="Category")
+    tree.heading("qty", text="Total Qty")
+    tree.heading("expiry", text="Nearest Expiry")
+    tree.heading("supplier", text="Supplier")
+    tree.heading("status", text="Status")
         
-    tree.column("name", width=160, anchor="w")        
-    tree.column("barcode", width=110, anchor="center")    
-    tree.column("category", width=100, anchor="center") 
-    tree.column("qty", width=90, anchor="center")       
-    tree.column("expiry", width=110, anchor="center")       
-    tree.column("status", width=110, anchor="center")   
-    
+    # ID အား လူမမြင်ရအောင် width=0, stretch=NO ပေးထားပြီး ကျန်ကော်လံများကို Mouse ဖြင့် ဆွဲဆန့်နိုင်အောင် ပြုလုပ်ထားပါသည်
+    tree.column("id", width=0, minwidth=0, stretch=tk.NO)
+    tree.column("name", width=180, anchor="w", stretch=True)
+    tree.column("barcode", width=110, anchor="center", stretch=True)    
+    tree.column("category", width=100, anchor="w", stretch=True) 
+    tree.column("qty", width=80, anchor="center", stretch=True)       
+    tree.column("expiry", width=110, anchor="center", stretch=True)       
+    tree.column("supplier", width=120, anchor="w", stretch=True)   
+    tree.column("status", width=110, anchor="center", stretch=True)   
     tree.pack(fill="both", expand=True)
 
-    # ဒေတာများကို သက်ဆိုင်ရာ အရောင်များနှင့်ပြသပေးမည့် Load Function
-    def load(search_text=""):
+    # 🌟 ဇယားထဲတွင် ဒေတာများကို ဆွဲထုတ်ပြသမည့် Load Function
+    def load(search_text="", search_type="all"):
         for item in tree.get_children():
             tree.delete(item)
 
-        conn = db()
-        c = conn.cursor()
+        # logic.py ထဲမှ စုပေါင်း JOIN ထားသော သန့်ရှင်းသည့် ဒေတာများကို လှမ်းယူခြင်း
+        all_rows = get_medicines_list_details()
         
-        if search_text:
-            c.execute("""
-                SELECT name, barcode, category, qty, expiry 
-                FROM medicines 
-                WHERE LOWER(name) LIKE ? OR LOWER(category) LIKE ? 
-                ORDER BY rowid DESC
-            """, (f"{search_text.lower()}%", f"{search_text.lower()}%"))
-        else:
-            c.execute("SELECT name, barcode, category, qty, expiry FROM medicines ORDER BY rowid DESC")
-            
-        rows = c.fetchall()
-        conn.close()
-
-        tree.tag_configure("Expired", foreground="#e74c3c", font=("Segoe UI", 12, "bold"))
-        tree.tag_configure("Near Expiry", foreground="#d35400", font=("Segoe UI", 12, "bold"))
-        tree.tag_configure("Normal", foreground="#1e7e34", font=("Segoe UI", 12, "bold"))
+        # Treeview ထဲသို သက်ဆိုင်ရာ သက်တမ်းအလိုက် Сာသားအရောင်ဆိုးရန် Tag များ သတ်မှတ်ခြင်း
+        tree.tag_configure("Expired", foreground="#e74c3c", font=("Segoe UI", 11, "bold"))      # စာသား အနီရောင်
+        tree.tag_configure("Near Expiry", foreground="#e67e22", font=("Segoe UI", 11, "bold"))  # Сာသား လိမ္မော်ရောင်
+        tree.tag_configure("Normal", foreground="#2ecc71")                                     # Сာသား အစိမ်းရောင်
+        tree.tag_configure("No Stock", foreground="#7f8c8d", background="#f2f2f2")             # ဇယား နောက်ခံ မီးခိုးရောင်
 
         target_item_id = None
 
-        for row in rows:
-            name, barcode, category, qty, expiry = row
-            status = get_status(expiry)
+        for row in all_rows:
+            med_id, name, barcode, category, qty, expiry, supplier_val, status = row
 
-            if status == "Expired":
-                tag = "Expired"
-            elif status == "Near Expiry":
-                tag = "Near Expiry"
-            else:
-                tag = "Normal"
+            # --- 🔍 PYTHON SIDE FILTER (Name Search & Category Filter) ---
+            if search_type == "name" and search_text:
+                if search_text.lower() not in name.lower():
+                    continue
+            elif search_type == "category" and search_text and search_text != "✨ All Categories":
+                if category != search_text:
+                    continue
 
-            item_id = tree.insert("", "end", values=(name, barcode, category, qty, expiry, status), tags=(tag,))
-            
+            # Treeview ထဲသို သိမ်းဆည်းထားသော အချက်အလက်များ သွတ်သွင်းခြင်း
+            item_id = tree.insert(
+                "", "end", 
+                values=(med_id, name, barcode, category, qty, expiry, supplier_val, status), 
+                tags=(status,)
+            )
+            # အသစ်သွင်းပြီး ပြန်လာပါက တန်းရွေးပေးထားရန်
             if focus_barcode and str(barcode) == str(focus_barcode):
                 target_item_id = item_id
-                if target_item_id:
-                    tree.selection_set(target_item_id)
-                    tree.focus(target_item_id)
-                    tree.see(target_item_id)
+                
+        if target_item_id:
+            tree.selection_set(target_item_id)
+            tree.focus(target_item_id)
+            tree.see(target_item_id)
 
-    # Search Buttons
-    tk.Button(search_frame, text="🔍 Search", font=("Segoe UI", 10, "bold"), bg="#3498db", fg="white", relief="flat", command=lambda: load(search_entry.get().strip())).pack(side="left", padx=5)
-    tk.Button(search_frame, text="🔄 Show All", font=("Segoe UI", 10, "bold"), bg="#95a5a6", fg="white", relief="flat", command=lambda: [search_entry.delete(0, tk.END), load()]).pack(side="left", padx=5)
+    def on_category_select(event):
+        selected_cat = cat_search_combo.get()
+        search_entry.delete(0, tk.END) 
+        load(search_text=selected_cat, search_type="category")
 
-    # --------- EDIT WINDOW (ပြုပြင်ရန် ပေါ့ပ်အပ်) -----------
+    cat_search_combo.bind("<<ComboboxSelected>>", on_category_select)
+
+    def reset_all():
+        search_entry.delete(0, tk.END)
+        cat_search_combo.current(0)
+        load()
+
+    tk.Button(search_frame, text="🔄 Show All", font=("Segoe UI", 10, "bold"), bg="#95a5a6", fg="white", relief="flat", command=reset_all).pack(side="left", padx=10)
+
+# --------- EDIT WINDOW (အခြေခံဆေးအချက်အလက် ပြုပြင်ရန် ပေါ့ပ်အပ်) -----------
     def edit():
         selected = tree.focus()
         if not selected:
@@ -123,76 +202,77 @@ def list_page(main, focus_barcode=None):
             return
         
         values = tree.item(selected, "values")
+        med_id = values[0] # ID အား လှမ်းယူခြင်း
         
-        # Window အသစ် ဆောက်ခြင်း
         edit_win = tk.Toplevel(main)
-        edit_win.title("Edit Medicine")
-        edit_win.geometry("380x320")
+        edit_win.title("Edit Medicine Details")
+        edit_win.geometry("380x280") # Qty နှင့် Expiry မပါတော့သဖြင့် အမြင့်ကို ညှိလိုက်ပါသည်
         edit_win.config(bg="#f8f9fa")
         edit_win.grab_set()
 
-        # Form UI Style
         lbl_style = {"bg": "#f8f9fa", "font": ("Segoe UI", 10, "bold"), "fg": "#34495e"}
         ent_style = {"font": ("Segoe UI", 11), "relief": "solid", "bd": 1}
 
-        tk.Label(edit_win, text="Medicine Name:", **lbl_style).grid(row=0, column=0, padx=15, pady=12, sticky="w")
-        name_entry = tk.Entry(edit_win, **ent_style)
-        name_entry.insert(0, values[0])
-        name_entry.grid(row=0, column=1, padx=15, pady=12)
-
-        # # ⭐️ (ပြင်ဆင်ချက်) Category ကို ရိုက်ထည့်ခိုင်းမည့်အစား Dropdown (Combobox) ပြောင်းလဲခြင်း
-        tk.Label(edit_win, text="Category:", **lbl_style).grid(row=1, column=0, padx=15, pady=12, sticky="w")
+        # Medicine Name
+        tk.Label(edit_win, text="Medicine Name:", **lbl_style).grid(row=0, column=0, padx=15, pady=15, sticky="w")
+        name_entry = tk.Entry(edit_win, **ent_style, width=23)
+        name_entry.insert(0, values[1])
+        name_entry.grid(row=0, column=1, padx=15, pady=15)
         
-        # 🌟 [ဒီနေရာလေးကို အစားထိုးပြင်ဆင်တာပါ]
-        # Database ထဲက အသစ်ထည့်ထားသမျှ Category List ကို လှမ်းယူခြင်း
+        # Category
+        tk.Label(edit_win, text="Category:", **lbl_style).grid(row=1, column=0, padx=15, pady=15, sticky="w")
         db_categories = get_all_categories()
-        
-        # အကယ်၍ database ထဲမှာ ဘာမှမရှိသေးရင် Backup အနေနဲ့ ဒါလေးတွေပြပေးထားမယ်
         if not db_categories:
             db_categories = ["⚪️ Tablet", "💊 Capsule", "🧪 Syrup", "💉 Injection", "🧴 Ointment", "📦 Other"]
 
-        # values နေရာမှာ ပုံသေ list အစား db_categories ကို ထည့်ပေးလိုက်ပါတယ်
-        cat_combo = ttk.Combobox(edit_win, values=db_categories, font=("Segoe UI", 11), state="readonly")
-        cat_combo.set(values[2]) # နဂိုမူလ database ထဲက တန်ဖိုးကို အလိုအလျောက် ရွေးပေးထားခြင်း
-        cat_combo.grid(row=1, column=1, padx=15, pady=12)
+        cat_combo = ttk.Combobox(edit_win, values=db_categories, font=("Segoe UI", 11), state="readonly", width=21)
+        cat_combo.set(values[3]) 
+        cat_combo.grid(row=1, column=1, padx=15, pady=15)
 
-        tk.Label(edit_win, text="Quantity:", **lbl_style).grid(row=2, column=0, padx=15, pady=12, sticky="w")
-        qty_entry = tk.Entry(edit_win, **ent_style)
-        qty_entry.insert(0, values[3])
-        qty_entry.grid(row=2, column=1, padx=15, pady=12)
-
-        tk.Label(edit_win, text="Expiry Date:", **lbl_style).grid(row=3, column=0, padx=15, pady=12, sticky="w")
-        exp_entry = tk.Entry(edit_win, **ent_style)
-        exp_entry.insert(0, values[4])
-        exp_entry.grid(row=3, column=1, padx=15, pady=12)
+        # Supplier Name
+        tk.Label(edit_win, text="Supplier Name:", **lbl_style).grid(row=2, column=0, padx=15, pady=15, sticky="w")
+        db_suppliers = get_all_suppliers()
+        if not db_suppliers:
+            db_suppliers = ["Default Supplier"]
+            
+        supplier_combo = ttk.Combobox(edit_win, values=db_suppliers, font=("Segoe UI", 11), state="readonly", width=21)
+        supplier_combo.set(values[6]) 
+        supplier_combo.grid(row=2, column=1, padx=15, pady=15)
 
         def update():
-            # သတ်မှတ်ချက်များ စစ်ဆေးခြင်း
-            if not name_entry.get().strip() or not cat_combo.get().strip() or not qty_entry.get().strip() or not exp_entry.get().strip():
+            name_val = name_entry.get().strip()
+            cat_val = cat_combo.get().strip()
+            supplier_val = supplier_combo.get().strip()
+
+            if not name_val or not cat_val or not supplier_val:
                 messagebox.showwarning("Error", "All fields are required!")
                 return
+
+            from database import db
+            try:
+                conn = db()
+                c = conn.cursor()
+                # 🌟 Medicines Table ထဲမှ အခြေခံအချက်အလက်ကို ပြင်ဆင်ခြင်း
+                c.execute("""
+                    UPDATE medicines 
+                    SET name=?, category=?, supplier=?
+                    WHERE id=?
+                """, (name_val, cat_val, supplier_val, med_id))
+                conn.commit()
+                conn.close()
                 
-            conn = db()
-            c = conn.cursor()
-            c.execute("""
-                UPDATE medicines 
-                SET name=?, category=?, qty=?, expiry=?
-                WHERE barcode=?
-            """, (name_entry.get().strip(), cat_combo.get().strip(), qty_entry.get().strip(), exp_entry.get().strip(), values[1]))
-            conn.commit()
-            conn.close()
-            
-            messagebox.showinfo("Success", "Medicine updated successfully!")
-            load()
-            edit_win.destroy()
+                messagebox.showinfo("Success", "Medicine details updated successfully!")
+                load()
+                edit_win.destroy()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to update medicine: {e}")
 
-        # Update Button
         tk.Button(
-            edit_win, text="💾 Update Now", font=("Segoe UI", 11, "bold"), 
+            edit_win, text="💾 Update Details", font=("Segoe UI", 11, "bold"), 
             bg="#2ecc71", fg="white", relief="flat", command=update, padx=20
-        ).grid(row=4, column=0, columnspan=2, pady=20, ipady=4)
+        ).grid(row=3, column=0, columnspan=2, pady=20, ipady=4)
 
-        # --------- DELETE FUNCTION -----------
+# --------- DELETE FUNCTION -----------
     def delete():
         selected = tree.focus()
         if not selected:
@@ -200,22 +280,43 @@ def list_page(main, focus_barcode=None):
             return
             
         values = tree.item(selected, "values")
+        med_id = values[0]
+        med_name = values[1]
         
-        confirm = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete '{values[0]}'?")
+        # 🌟 CASCADE ကြောင့် Batch အားလုံးပါ တွဲပျက်သွားမည်ဖြစ်ကြောင်း အသိပေးချက်ထည့်ခြင်း
+        confirm = messagebox.askyesno(
+            "Confirm Delete", 
+            f"Are you sure you want to delete '{med_name}'?\n(This will automatically delete all its batch records!)"
+        )
         if confirm:
-            conn = db()
-            c = conn.cursor()
-            c.execute("DELETE FROM medicines WHERE barcode=?", (values[1],))
-            conn.commit()
-            conn.close()
-            load()
-            messagebox.showinfo("Deleted", "Medicine deleted successfully!")
+            if delete_medicine_from_db(med_id):
+                messagebox.showinfo("Deleted", f"'{med_name}' and its batch items deleted successfully!")
+                load()
+            else:
+                messagebox.showerror("Error", "Failed to delete medicine from database.")
 
     # Action Buttons Frame
     btn_frame = tk.Frame(main, bg="#f8f9fa")
     btn_frame.pack(pady=15)
 
-    tk.Button(btn_frame, text="📝 Edit Selected", font=("Segoe UI", 11, "bold"), bg="#f1c40f", fg="white", relief="flat", command=edit, padx=15, pady=5).grid(row=0, column=0, padx=10)
-    tk.Button(btn_frame, text="🗑 Delete Selected", font=("Segoe UI", 11, "bold"), bg="#e74c3c", fg="white", relief="flat", command=delete, padx=15, pady=5).grid(row=0, column=1, padx=10)
+    # 🌟 အောက်က row=0 ထဲမှာ မင်းရဲ့ Edit နဲ့ Delete ခလုတ်တွေဘေးမှာ column=2 အနေနဲ့ စနစ်တကျ တိုးချဲ့ထည့်သွင်းပေးထားပါတယ်ဗျာ
+    tk.Button(btn_frame, text="📝 Edit Details", font=("Segoe UI", 11, "bold"), bg="#f1c40f", fg="white", relief="flat", command=edit, padx=15, pady=5).grid(row=0, column=0, padx=10)
+    tk.Button(btn_frame, text="🗑 Delete Medicine", font=("Segoe UI", 11, "bold"), bg="#e74c3c", fg="white", relief="flat", command=delete, padx=15, pady=5).grid(row=0, column=1, padx=10)
+    
+    # 🌟 (ထပ်တိုး) သက်တမ်းကုန်ဆေးများ ရှင်းထုတ်မည့် အနီရောင်ခလုတ်
+    tk.Button(
+        btn_frame, 
+        text="🗑 Clear Expired Stock (Qty -> 0)", 
+        font=("Segoe UI", 11, "bold"), 
+        bg="#c0392b", # ပိုရင့်သော အနီရောင် Theme
+        fg="white", 
+        relief="flat", 
+        cursor="hand2",
+        padx=15, 
+        pady=5,
+        # load ဖန်ရှင်ကို callback အနေနဲ့ လှမ်းပေးလိုက်လို စတော့ခ် 0 ဖြစ်သွားတာ ချက်ချင်း ဇယားထဲမှာ မြင်ရမှာပါ
+        command=lambda: clear_expired_stock_update(load) 
+    ).grid(row=0, column=2, padx=10)
 
+    # စာမျက်နှာစတင်ပွင့်သည်နှင့် ဒေတာများကို load လုပ်ခြင်း
     load()

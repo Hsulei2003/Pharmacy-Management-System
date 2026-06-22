@@ -1,0 +1,5 @@
+opencv_python==4.13.0.92
+pygame==2.6.1
+tkcalendar==1.6.1
+zxing_cpp==3.0.0
+python-barcode==0.16.1

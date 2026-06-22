@@ -10,13 +10,13 @@ def dashboard(main):
     main.config(bg="#f8f9fa")
 
     # ခေါင်းစဉ်
-    tk.Label(main, text="Pharmacy Dashboard", font=("Segoe UI", 24, "bold"), fg="#2c3e50", bg="#f8f9fa").pack(pady=15)
+    tk.Label(main, text="Pharmacy Dashboard (Batch System)", font=("Segoe UI", 24, "bold"), fg="#2c3e50", bg="#f8f9fa").pack(pady=15)
 
     # ===== TOP PANEL (STATUS COUNTERS) =====
     frame = tk.Frame(main, bg="#f8f9fa")
     frame.pack(pady=10)
 
-    total_label = tk.Label(frame, text="Total\n0", bg="#34495e", fg="white", font=("Segoe UI", 12, "bold"), width=18, height=3, relief="flat")
+    total_label = tk.Label(frame, text="Total Medicines\n0", bg="#34495e", fg="white", font=("Segoe UI", 12, "bold"), width=18, height=3, relief="flat")
     total_label.pack(side="left", padx=15)
 
     near_label = tk.Label(frame, text="Near Expiry\n0", bg="#d35400", fg="white", font=("Segoe UI", 12, "bold"), width=18, height=3, relief="flat")
@@ -63,7 +63,7 @@ def dashboard(main):
     panel_frame.grid_columnconfigure(1, weight=1)
     panel_frame.grid_rowconfigure(0, weight=1)
 
- # ===== QUICK SCAN SECTION =====
+    # ===== QUICK SCAN SECTION =====
     scan_frame = tk.LabelFrame(main, text=" ⚡️ Quick Check Medicine ", font=("Segoe UI", 11, "bold"), fg="#2c3e50", bg="white", relief="solid", bd=1, padx=15, pady=10)
     scan_frame.pack(pady=15, fill="x", padx=35)
 
@@ -76,23 +76,21 @@ def dashboard(main):
     # Quick Scan ရလဒ်ပြသမည့် Container Frame
     result_container = tk.Frame(scan_frame, bg="white")
     result_container.pack(side="right", padx=15, fill="x", expand=True)
-
-    # 🌟 [ဖြည့်စွက်ချက်] အမှားခြစ် ❌ တစ်ခုတည်း သီးသန့်ကြီးပြရန် Label (ပုံမှန်အချိန်တွင် စာသားမထည့်ဘဲ ထားပါမည်)
+    # အမှားခြစ် ❌ တစ်ခုတည်း သီးသန့်ကြီးပြရန် Label
     error_icon_label = tk.Label(result_container, text="", font=("Segoe UI", 20), fg="#c0392b", bg="white")
     error_icon_label.pack(side="left", padx=(0, 5))
 
     result_text = tk.Label(result_container, text="Scan a barcode to quick check status...", font=("Segoe UI", 10, "italic"), fg="gray", bg="white")
     result_text.pack(side="left", padx=5)
 
-    # Status Badge အတွက် သီးသန့် Label (Normal, Expired စာသားများအတွက် အရွယ်အစား ပုံမှန် ၁၀ ပဲ ထားရှိပါသည်)
+    # Status Badge အတွက် သီးသန့် Label 
     status_badge = tk.Label(result_container, text="", font=("Segoe UI", 10, "bold"), padx=8, pady=2, bg="white")
     status_badge.pack(side="left", padx=5)
 
-    # --- ရှာဖွေစစ်ဆေးသည့် Logic ---
+    # --- 🛠️ ရှာဖွေစစ်ဆေးသည့် Batch Logic ပြင်ဆင်ချက် ---
     def scan(event=None, scanned_code=None):
         code = scanned_code if scanned_code else scan_entry.get().strip()
         
-        # စစ်ဆေးမှုအသစ်စတိုင်း ❌ အမှားခြစ်အကြီးကြီးကို အရင်ဖျောက်ထားမည်
         error_icon_label.config(text="") 
         
         if not code:
@@ -103,33 +101,45 @@ def dashboard(main):
         try:
             conn = db()
             c = conn.cursor()
-            c.execute("SELECT name, barcode, category, qty, expiry FROM medicines WHERE barcode=?", (code,))
+            # 🌟 Batch စနစ်အတွက် ဆေးရဲ့ စုစုပေါင်းအရေအတွက် (SUM) နဲ့ အစောဆုံးသက်တမ်းကုန်မယ့်ရက် (MIN) ကို တွက်ချက်ခြင်း
+            c.execute("""
+                SELECT m.name, m.barcode, m.category, SUM(b.qty), MIN(b.expiry) 
+                FROM medicines m
+                LEFT JOIN medicine_batches b ON m.id = b.medicine_id
+                WHERE m.barcode = ?
+                GROUP BY m.id
+            """, (code,))
             data = c.fetchone()
             conn.close()
 
-            if data:
+            if data and data[0] is not None:
                 name, barcode, category, qty, expiry = data
-                status = get_status(expiry)
+                
+                # အကယ်၍ အဝင် Batch လုံးဝမရှိသေးပါက အရေအတွက်ကို 0 ပေးပြီး သက်တမ်းကို No Date ဟု သတ်မှတ်မည်
+                qty = qty if qty is  not None else 0
+                expiry = expiry if expiry else "No Batch"
+                
+                status = get_status(expiry) if expiry != "No Batch" else "Normal"
+                if qty == 0: status = "No Stock"
                 
                 result_text.config(
-                    text=f"💊 {name}  |  Stock: {qty}  |  Expiry: {expiry}  |  Status: ", 
+                    text=f"💊 {name}  |  Total Stock: {qty}  |  Nearest Expiry: {expiry}  |  Status: ", 
                     font=("Segoe UI", 11, "bold"),
                     fg="#2c3e50"
                 )
                 
-                # အတုံးပုံစံ (Badge) စတိုင် အရောင်ခွဲခြားခြင်း (အရွယ်အစား ပုံမှန်အတိုင်းပဲ မပြောင်းလဲပါ)
                 if status == "Expired":
-                    status_badge.config(text=" Expired ", font=("Segoe UI", 10, "bold"), fg="#c0392b", bg="#fce4e4", padx=8, pady=2)
+                    status_badge.config(text=" Expired ", font=("Segoe UI", 10, "bold"), fg="#c0392b", bg="#fce4e4")
                 elif status == "Near Expiry":
-                    status_badge.config(text=" Near Expiry ", font=("Segoe UI", 10, "bold"), fg="#d35400", bg="#fef5e7", padx=8, pady=2)
+                    status_badge.config(text=" Near Expiry ", font=("Segoe UI", 10, "bold"), fg="#d35400", bg="#fef5e7")
+                elif status == "No Stock":
+                    status_badge.config(text=" Out of Stock ", font=("Segoe UI", 10, "bold"), fg="#7f8c8d", bg="#eaeded")
                 else:
-                    status_badge.config(text=" Normal ", font=("Segoe UI", 10, "bold"), fg="#1e7e34", bg="#d4edda", padx=8, pady=2)
+                    status_badge.config(text=" Normal ", font=("Segoe UI", 10, "bold"), fg="#1e7e34", bg="#d4edda")
             else:
-                # 🌟 [ဒီနေရာတွင် ပြင်ဆင်လိုက်ပါပြီ] 
-                # စာသားကို ပုံမှန် Size 11 အတိုင်းပဲ ထားပြီး၊ Label အသစ်ထဲမှာ ❌ ကြီးကို သီးသန့် Size 24 အကြီးကြီး ဖော်ပြခြင်း
                 result_text.config(text="Medicine Not Found!", font=("Segoe UI", 11, "bold"), fg="#c0392b")
-                error_icon_label.config(text="❌") # ❌ ကြီးကို သီးသန့်အကြီးကြီး ဖော်ပေးလိုက်ခြင်း
-                status_badge.config(text="", bg="white") # Normal/Expired badge ကို ဗလာလုပ်ထားခြင်း
+                error_icon_label.config(text="❌") 
+                status_badge.config(text="", bg="white") 
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to check medicine:\n{e}")
@@ -148,23 +158,32 @@ def dashboard(main):
         scanner = BarcodeScanner()
         cap = cv2.VideoCapture(0)
         scanned_code = None
+
+        window_name = "Quick Check Barcode (Press 'q' to Exit)"
         
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
                 
+            frame = cv2.flip(frame, 1) 
             res = scanner.scan_from_frame(frame)
             if res:
-                # 🌟 [ဤနေရာတွင်သာ အသံမြည်စေပါသည်] Webcam ကင်မရာဖြင့် မိမှသာ "တီ" ဟု အသံမြည်ခြင်း
                 import winsound
                 winsound.Beep(2000, 150)
-
                 scanned_code = res
                 break
                 
-            cv2.imshow("Quick Check Barcode (Press 'q' to Exit)", frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            cv2.imshow(window_name, frame)
+            key = cv2.waitKey(1) & 0xFF
+
+            if key == ord('q'):
+                break
+
+            try:
+                if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
+                    break
+            except:
                 break
                 
         cap.release()
@@ -190,29 +209,40 @@ def dashboard(main):
     )
     quick_scan_btn.pack(side="left", padx=5)
 
-    # ===== AUTO BACKGROUND SCAN & UI CARD GENERATOR =====
+    # ===== 🛠️ AUTO BACKGROUND SCAN & BATCH UI CARD GENERATOR =====
     def auto_scan():
         if not exp_scroll_frame.winfo_exists() or not near_scroll_frame.winfo_exists():
             return 
         try:
             conn = db()
             c = conn.cursor()
-            c.execute("SELECT name, barcode, category, qty, expiry FROM medicines")
-            medicines = c.fetchall()
+            
+            # ၁။ စုစုပေါင်း ဆေးအမျိုးအစား အရေအတွက်ကို ရေတွက်ခြင်း
+            c.execute("SELECT COUNT(*) FROM medicines")
+            total = c.fetchone()[0] or 0
+            
+            # ၂။ Batch အားလုံးကို JOIN လုပ်ပြီး ဒေတာဆွဲထုတ်ခြင်း (စတော့ရှိတာတွေကိုပဲ စစ်ပါမယ်)
+            c.execute("""
+                SELECT m.name, m.barcode, b.batch_number, b.qty, b.expiry 
+                FROM medicine_batches b
+                JOIN medicines m ON b.medicine_id = m.id
+                WHERE b.qty > 0
+            """)
+            batches = c.fetchall()
             conn.close()
 
-            total = len(medicines)
             near = 0
             expired = 0
 
+            # ဇယားဟောင်းများ ရှင်းထုတ်ခြင်း
             for widget in exp_scroll_frame.winfo_children():
                 widget.destroy()
             for widget in near_scroll_frame.winfo_children():
                 widget.destroy()
 
             today = datetime.today()
-            for med in medicines:
-                name, barcode, category, qty, expiry = med
+            for batch in batches:
+                name, barcode, batch_no, qty, expiry = batch
                 status = get_status(expiry)
 
                 try:
@@ -225,6 +255,7 @@ def dashboard(main):
 
                 days = (exp_date - today).days + 1
 
+                # (က) သက်တမ်းကုန်သွားသော ကတ်များ ထုတ်ပေးခြင်း
                 if status == "Expired":
                     expired += 1
                     card = tk.Frame(exp_scroll_frame, bg="white", highlightbackground="#f5c6cb", highlightthickness=1, bd=0)
@@ -235,9 +266,11 @@ def dashboard(main):
                     
                     tk.Label(info_frame, text=f"💊 {name}", font=("Segoe UI", 11, "bold"), fg="#2c3e50", bg="white").pack(side="left")
                     tk.Label(info_frame, text=" Expired ", font=("Segoe UI", 9, "bold"), fg="#c0392b", bg="#fce4e4", padx=6, pady=2).pack(side="right")
-                    
-                    tk.Label(card, text=f"Barcode: {barcode}", font=("Segoe UI", 9), fg="#7f8c8d", bg="white", anchor="w").pack(fill="x", padx=10, pady=(0,5))
 
+                    # Batch Number နှင့် အရေအတွက်ပါ တွဲပြပေးခြင်း
+                    tk.Label(card, text=f"Barcode: {barcode}  |  Batch: {batch_no}  |  Qty: {qty}", font=("Segoe UI", 9), fg="#7f8c8d", bg="white", anchor="w").pack(fill="x", padx=10, pady=(0,5))
+
+                # (ခ) သက်တမ်းကုန်ခါနီး ကတ်များ ထုတ်ပေးခြင်း
                 elif status == "Near Expiry":
                     near += 1
                     card = tk.Frame(near_scroll_frame, bg="white", highlightbackground="#fed7a5", highlightthickness=1, bd=0)
@@ -249,13 +282,15 @@ def dashboard(main):
                     tk.Label(info_frame, text=f"⚠️ {name}", font=("Segoe UI", 11, "bold"), fg="#2c3e50", bg="white").pack(side="left")
                     tk.Label(info_frame, text=f" {days} days left ", font=("Segoe UI", 9, "bold"), fg="#d35400", bg="#fef5e7", padx=6, pady=2).pack(side="right")
                     
-                    tk.Label(card, text=f"Barcode: {barcode}", font=("Segoe UI", 9), fg="#7f8c8d", bg="white", anchor="w").pack(fill="x", padx=10, pady=(0,5))
+                    # Batch Number နှင့် အရေအတွက်ပါ တွဲပြပေးခြင်း
+                    tk.Label(card, text=f"Barcode: {barcode}  |  Batch: {batch_no}  |  Qty: {qty}", font=("Segoe UI", 9), fg="#7f8c8d", bg="white", anchor="w").pack(fill="x", padx=10, pady=(0,5))
 
             if expired == 0:
                 tk.Label(exp_scroll_frame, text="No expired medicine", font=("Segoe UI", 10, "italic"), fg="gray", bg="white").pack(pady=20)
             if near == 0:
                 tk.Label(near_scroll_frame, text="No near expiry medicine", font=("Segoe UI", 10, "italic"), fg="gray", bg="white").pack(pady=20)
 
+            # UI Status Counters များကို ကွက်တိ Update လုပ်ပေးခြင်း
             total_label.config(text=f"Total Medicines\n{total}")
             near_label.config(text=f"Near Expiry\n{near}")
             expired_label.config(text=f"Expired\n{expired}")
