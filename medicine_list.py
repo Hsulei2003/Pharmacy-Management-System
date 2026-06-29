@@ -3,8 +3,6 @@ from tkinter import ttk, messagebox
 import datetime
 from database import db # မင်းရဲ့ ဒေတာဘေ့စ် ချိတ်ဆက်မှုဖိုင်
 from utils import clear
-
-# 🌟 logic.py ထဲမှ ပြင်ဆင်ထားသော Batch စနစ်သုံး Functions များကို လှမ်းယူခြင်း
 from logic import get_status, get_all_categories, get_all_suppliers, get_medicines_list_details, delete_medicine_from_db
 
 # =================================================================
@@ -13,7 +11,6 @@ from logic import get_status, get_all_categories, get_all_suppliers, get_medicin
 def clear_expired_stock_update(refresh_callback):
     current_date = datetime.date.today().strftime("%Y-%m-%d")
     
-    # ဆိုင်ရှင်ကို အတည်ပြုချက် တောင်းခြင်း (မတော်တဆ နှိပ်မိခြင်းမှ ကာကွယ်ရန်)
     confirm = messagebox.askyesno(
         "Confirm Action", 
         "Are you sure you want to set Qty to 0 for all expired medicine batches?"
@@ -147,9 +144,9 @@ def list_page(main, focus_barcode=None):
         all_rows = get_medicines_list_details()
         
         # Treeview ထဲသို သက်ဆိုင်ရာ သက်တမ်းအလိုက် Сာသားအရောင်ဆိုးရန် Tag များ သတ်မှတ်ခြင်း
-        tree.tag_configure("Expired", foreground="#e74c3c", font=("Segoe UI", 11, "bold"))      # စာသား အနီရောင်
-        tree.tag_configure("Near Expiry", foreground="#e67e22", font=("Segoe UI", 11, "bold"))  # Сာသား လိမ္မော်ရောင်
-        tree.tag_configure("Normal", foreground="#2ecc71")                                     # Сာသား အစိမ်းရောင်
+        tree.tag_configure("Expired", foreground="#e74c3c", font=("Segoe UI", 13, "bold"))      # စာသား အနီရောင်
+        tree.tag_configure("Near Expiry", foreground="#e67e22", font=("Segoe UI", 13, "bold"))  # Сာသား လိမ္မော်ရောင်
+        tree.tag_configure("Normal", foreground="#27ae60", font=("Segoe UI", 13, "bold"))                                     # Сာသား အစိမ်းရောင်
         tree.tag_configure("No Stock", foreground="#7f8c8d", background="#f2f2f2")             # ဇယား နောက်ခံ မီးခိုးရောင်
 
         target_item_id = None
@@ -159,7 +156,7 @@ def list_page(main, focus_barcode=None):
 
             # --- 🔍 PYTHON SIDE FILTER (Name Search & Category Filter) ---
             if search_type == "name" and search_text:
-                if search_text.lower() not in name.lower():
+                if not name.lower().startswith(search_text.lower()):
                     continue
             elif search_type == "category" and search_text and search_text != "✨ All Categories":
                 if category != search_text:

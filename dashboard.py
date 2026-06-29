@@ -121,9 +121,14 @@ def dashboard(main):
                 
                 status = get_status(expiry) if expiry != "No Batch" else "Normal"
                 if qty == 0: status = "No Stock"
+
+                display_name = name
+                if len(display_name) > 12:
+                    display_name = display_name[:10] + ".."
+
                 
                 result_text.config(
-                    text=f"💊 {name}  |  Total Stock: {qty}  |  Nearest Expiry: {expiry}  |  Status: ", 
+                    text=f"💊 {display_name}  |  Total Stock: {qty}  |  Nearest Expiry: {expiry}  |  Status: ", 
                     font=("Segoe UI", 11, "bold"),
                     fg="#2c3e50"
                 )

@@ -126,41 +126,65 @@ def add_medicine_to_db(name, barcode, category, batch_number, qty, expiry, suppl
 # 🌟 ၆။ ဆေးစာရင်းဇယား (Medicine List) အတွက် ဒေတာထုတ်ပေးမည့် Function
 # =====================================================================
 def get_medicines_list_details():
+    import datetime
     from database import db
+    current_date = datetime.date.today().strftime("%Y-%m-%d")
+    
     conn = db()
     c = conn.cursor()
     
-    # ဒီနေရာမှာ SQL LEFT JOIN နဲ့ GROUP BY ကို သုံးပြီး ဆေးတစ်မျိုးချင်းစီရဲ့ 
-    # Batch အားလုံးပေါင်း စုစုပေါင်း အရေအတွက် (Total Qty) နဲ့ အစောဆုံး ကုန်မယ့် Expiry ရက်စွဲကို ရှာထုတ်ပါမယ်။
-    query = """
+    # 🌟 ရှင်းလင်းချက် Query - 
+    # ၁။ စတော့ခ်ရှိသေးသော ဘတ်ချ်များထဲမှ အစောဆုံး သက်တမ်းကုန်မည့်ရက် (Nearest Expiry) ကို တွက်သည်။
+    # ၂။ အကယ်၍ စတော့ခ်အားလုံး 0 ဖြစ်နေပါက ရှိသမျှ ဘတ်ချ်ထဲမှ ရက်စွဲကို ယူပြီး Status ကို "No Stock" ဟု သတ်မှတ်သည်။
+    c.execute("""
         SELECT 
             m.id, 
             m.name, 
             m.barcode, 
-            m.category, 
-            COALESCE(SUM(b.qty), 0) as total_qty, 
-            COALESCE(MIN(b.expiry), 'N/A') as nearest_expiry, 
+            m.category,
+            COALESCE(SUM(b.qty), 0) as total_qty,
+            -- စတော့ခ်ကျန်သေးတဲ့ ဘတ်ချ်တွေရဲ့ သက်တမ်းကို ဦးစားပေးယူမည်၊ မရှိရင် အားလုံးထဲက အစောဆုံးရက်ကိုယူမည်
+            COALESCE(
+                MIN(CASE WHEN b.qty > 0 THEN b.expiry END), 
+                MIN(b.expiry)
+            ) as nearest_expiry,
             m.supplier
         FROM medicines m
         LEFT JOIN medicine_batches b ON m.id = b.medicine_id
         GROUP BY m.id
         ORDER BY m.id DESC
-    """
-    c.execute(query)
+    """)
     rows = c.fetchall()
-    conn.close()
     
-    # Treeview ဇယားထဲမှာ သတ်ရပ်စွာ ပြသနိုင်ဖို ဒေတာကို ပုံစံပြန်ညှိခြင်း
-    processed_rows = []
+    final_details = []
     for row in rows:
-        med_id, name, barcode, cat, qty, nearest_expiry, supplier = row
+        med_id, name, barcode, category, total_qty, expiry, supplier = row
         
-        # အစောဆုံး ကုန်မယ့် Expiry ရက်စွဲကို ကြည့်ပြီး Status စစ်ဆေးမယ်
-        status = get_status(nearest_expiry) if nearest_expiry != 'N/A' else "No Stock"
+        # သက်တမ်းကုန်ရက် မရှိခဲ့လျှင် (ဘတ်ချ် လုံးဝမသွင်းရသေးလျှင်)
+        if not expiry:
+            expiry = "No Batch"
+            status = "No Stock" if total_qty == 0 else "Normal"
         
-        processed_rows.append((med_id, name, barcode, cat, qty, nearest_expiry, supplier, status))
+        # 🌟 စတော့ခ် လုံးဝမရှိတော့လျှင် Status ကို "No Stock" ဟု တန်းသတ်မှတ်မည်
+        elif total_qty == 0:
+            status = "No Stock"
+            
+        else:
+            # စတော့ခ်ရှိသေးလျှင် လက်ရှိရက်စွဲနှင့် နှိင်းယှဉ်၍ အမှန်တကယ် အရောင်ပြောင်းမည်
+            exp_date = datetime.datetime.strptime(expiry, "%Y-%m-%d").date()
+            today = datetime.date.today()
+            
+            if exp_date < today:
+                status = "Expired"
+            elif (exp_date - today).days <= 7: # ၃၀ ရက်အတွင်းဆိုလျှင်
+                status = "Near Expiry"
+            else:
+                status = "Normal"
+                
+        final_details.append((med_id, name, barcode, category, total_qty, expiry, supplier, status))
         
-    return processed_rows
+    conn.close()
+    return final_details
 
 
 # =====================================================================

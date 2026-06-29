@@ -8,9 +8,11 @@ class LoginWindow:
         
         self.root = tk.Tk()
         self.root.title("Pharmacy System - Login")
+        
         self.root.geometry("450x400") 
         self.root.config(bg="#f8f9fa")
         self.root.resizable(False, False)
+        self.root.iconbitmap("app_icon.ico")
         
         # Screen ရဲ့ အလယ်တည့်တည့်မှာ Window ပွင့်စေရန်
         self.root.eval('tk::PlaceWindow . center')

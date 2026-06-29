@@ -6,6 +6,7 @@ from scan_sell import scan_page
 from medicine_list import list_page
 from add_category import add_category_page
 from add_supplier import add_supplier_page
+from account import account_page
 from login import LoginWindow
 
 create_table()
@@ -16,6 +17,7 @@ def show_main_window():
     root.title("Pharmacy Management System")
     root.geometry("1000x600")
     root.config(bg="#f8f9fa")
+    root.iconbitmap("app_icon.ico")
     
     # Maximize ချဲ့လိုရအောင် ဖွင့်ထားပေးပါသည်
     root.resizable(True, True) 
@@ -96,6 +98,9 @@ def show_main_window():
 
     btn_scan = create_sidebar_btn("🛍", "Scan & Sell", lambda: scan_page(main))
     btn_scan.pack(pady=8, fill="x", padx=10, ipady=6)
+
+    btn_account = create_sidebar_btn("⚙️", "Account Settings", lambda: account_page(main))
+    btn_account.pack(pady=8, fill="x", padx=10, ipady=6)
 
     # Sidebar ရဲ့ အောက်ခြေအဆုံးတွင် ပေါ်မည့် Log Out ခလုတ်လေး
     logout_btn = tk.Button(
