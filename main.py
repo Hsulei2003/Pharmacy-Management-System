@@ -8,12 +8,24 @@ from add_category import add_category_page
 from add_supplier import add_supplier_page
 from account import account_page
 from login import LoginWindow
+from authentication.session import (logout as clear_session,get_current_user)
+from user_management import user_management_page
+from audit_log import audit_log_page
 
 create_table()
 
 def show_main_window():
     # ---------- MAIN WINDOW ----------
     root = tk.Tk()
+    
+    current_user = get_current_user()
+
+    if current_user is None:
+        root.destroy()
+        return
+
+    role = current_user["role"]
+
     root.title("Pharmacy Management System")
     root.geometry("1000x600")
     root.config(bg="#f8f9fa")
@@ -24,8 +36,30 @@ def show_main_window():
 
     # Log Out ပြုလုပ်မည့် လုပ်ဆောင်ချက်
     def logout():
+
+        current = get_current_user()
+
+        if current:
+
+            from database import log_action
+
+            log_action(
+                current["id"],
+                current["username"],
+                current["role"],
+                "LOGOUT",
+                "Authentication",
+                "User logged out"
+            )
+
+        clear_session()
+
         root.destroy()
-        login_app = LoginWindow(on_success=show_main_window)
+
+        login_app = LoginWindow(
+            on_success=show_main_window
+        )
+
         login_app.run()
 
     # ဘယ်ဘက် Sidebar
@@ -84,23 +118,45 @@ def show_main_window():
     btn_dashboard = create_sidebar_btn("📊", "Dashboard", lambda: dashboard(main))
     btn_dashboard.pack(pady=8, fill="x", padx=10, ipady=6)
 
-    btn_dashboard = create_sidebar_btn("📦", "Category Setup", lambda: add_category_page(main))
-    btn_dashboard.pack(pady=8, fill="x", padx=10, ipady=6)
+    btn_category = create_sidebar_btn("📦", "Category Setup", lambda: add_category_page(main))
+    if role == "Admin":
+        btn_category.pack(pady=8, fill="x", padx=10, ipady=6)
 
     btn_supplier = create_sidebar_btn("🏢", "Supplier Setup", lambda: add_supplier_page(main))
-    btn_supplier.pack(pady=8, fill="x", padx=10, ipady=6)
+    if role == "Admin":
+        btn_supplier.pack(pady=8, fill="x", padx=10, ipady=6)
 
     btn_add = create_sidebar_btn("➕", "Add Medicine", lambda: add_page(main))
-    btn_add.pack(pady=8, fill="x", padx=10, ipady=6)
+    if role in ("Admin", "Staff"):
+        btn_add.pack(pady=8, fill="x", padx=10, ipady=6)
 
     btn_list = create_sidebar_btn("📋", "Medicine List", lambda: list_page(main))
-    btn_list.pack(pady=8, fill="x", padx=10, ipady=6)
+    if role in ("Admin", "Staff"):
+        btn_list.pack(pady=8, fill="x", padx=10, ipady=6)
 
     btn_scan = create_sidebar_btn("🛍", "Scan & Sell", lambda: scan_page(main))
     btn_scan.pack(pady=8, fill="x", padx=10, ipady=6)
 
     btn_account = create_sidebar_btn("⚙️", "Account Settings", lambda: account_page(main))
     btn_account.pack(pady=8, fill="x", padx=10, ipady=6)
+
+    btn_user = create_sidebar_btn("👥","User Management",lambda: user_management_page(main))
+    if role == "Admin":
+        btn_user.pack(pady=8,fill="x",padx=10,ipady=6)
+
+    btn_audit = create_sidebar_btn(
+        "📜",
+        "Audit Logs",
+        lambda: audit_log_page(main)
+    )
+
+    if role == "Admin":
+        btn_audit.pack(
+            pady=8,
+            fill="x",
+            padx=10,
+            ipady=6
+        )
 
     # Sidebar ရဲ့ အောက်ခြေအဆုံးတွင် ပေါ်မည့် Log Out ခလုတ်လေး
     logout_btn = tk.Button(

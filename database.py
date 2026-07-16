@@ -1,4 +1,5 @@
 import sqlite3
+from authentication.security import hash_password
 
 def db():
     return sqlite3.connect("pharmacy.db", timeout=20)
@@ -35,10 +36,27 @@ def create_table():
     
     # Login Users Table
     c.execute("""
-    CREATE TABLE IF NOT EXISTS users (
+    CREATE TABLE IF NOT EXISTS users(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE,
-        password TEXT
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'Staff',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Audit Logs Table
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS audit_logs(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        username TEXT NOT NULL,
+        role TEXT NOT NULL,
+        action TEXT NOT NULL,
+        module TEXT NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id)
     )
     """)
 
@@ -61,8 +79,71 @@ def create_table():
     )
     """)
     
-    # စမ်းသပ်ရန် အကောင့်တစ်ခု ကြိုထည့်ထားခြင်း
-    c.execute("INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)", ("admin", "admin123"))
+    admin_hash = hash_password("admin123")
+
+    c.execute("""
+    INSERT OR IGNORE INTO users
+    (
+        username,
+        password_hash,
+        role
+    )
+    VALUES
+    (
+        ?,
+        ?,
+        ?
+    )
+    """,
+    (
+        "admin",
+        admin_hash,
+        "Admin"
+    ))
     
     conn.commit()
     conn.close()
+
+def log_action(
+        user_id,
+        username,
+        role,
+        action,
+        module,
+        description
+    ):
+
+        conn = db()
+        c = conn.cursor()
+
+        c.execute("""
+        INSERT INTO audit_logs
+        (
+            user_id,
+            username,
+            role,
+            action,
+            module,
+            description
+        )
+        VALUES
+        (
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?
+        )
+        """,
+        (
+            user_id,
+            username,
+            role,
+            action,
+            module,
+            description
+        ))
+
+        conn.commit()
+        conn.close()
