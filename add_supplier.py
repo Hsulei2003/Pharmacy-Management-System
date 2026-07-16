@@ -4,22 +4,20 @@ import re
 from utils import clear
 
 def add_supplier_page(main):
-    # Circular Import မဖြစ်စေရန် Local Import သုံးထားပါသည်
     from logic import add_supplier_to_db, get_suppliers_list_details, delete_supplier_from_db
 
     clear(main)
     main.config(bg="#f8f9fa")
 
-    # ခေါင်းစဉ်
     tk.Label(
         main, text="🏢 Supplier Management Setup", font=("Segoe UI", 20, "bold"), fg="#2c3e50", bg="#f8f9fa"
     ).pack(pady=15)
 
-    # ဘယ်/ညာ ခွဲရန် Main Frame
+    # Main Frame
     content_frame = tk.Frame(main, bg="#f8f9fa")
     content_frame.pack(fill="both", expand=True, padx=15, pady=5)
 
-    # ==================== (ဘယ်ဘက်ခြမ်း) ADD SUPPLIER FORM ====================
+    # ==================== (Left) ADD SUPPLIER FORM ====================
     left_frame = tk.LabelFrame(
         content_frame, text="Add New Supplier", font=("Segoe UI", 11, "bold"), 
         bg="white", fg="#34495e", relief="solid", bd=1, padx=15, pady=15, width=320      
@@ -45,7 +43,7 @@ def add_supplier_page(main):
     address_entry = tk.Entry(left_frame, **ent_style, width=28)
     address_entry.pack(anchor="w", pady=(0, 15), ipady=3)
 
-    # ==================== (ညာဘက်ခြမ်း) SUPPLIER LIST ====================
+    # ==================== (Right) SUPPLIER LIST ====================
     right_frame = tk.LabelFrame(
         content_frame, text="Suppliers List", font=("Segoe UI", 11, "bold"), 
         bg="white", fg="#34495e", relief="solid", bd=1, padx=10, pady=10
@@ -77,8 +75,7 @@ def add_supplier_page(main):
     tree.column("address", width=120, anchor="w", stretch=True)
     tree.pack(fill="both", expand=True, pady=(0, 10))
 
-    # 🔄 🌟 [အစီအစဉ်ပြင်ဆင်ချက်] LOAD SUPPLIERS FUNCTION ကို ထိပ်ဆုံးသို ရွှေ့ထားပါသည်
-    # ဤနေရာတွင် ထားမှသာ အောက်က Save, Edit, Delete ထဲက လှမ်းခေါ်ရင် Python က သိမှာဖြစ်ပါတယ်
+
     def load_suppliers():
         for item in tree.get_children():
             tree.delete(item)
@@ -89,7 +86,7 @@ def add_supplier_page(main):
         except Exception as e:
             print(f"Load Suppliers Error: {e}")
 
-            # Format စစ်ဆေးသည့် Functions များ
+    # Checking Format Functions 
     def is_valid_email(email):
         pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
         return re.match(pattern, email) is not None
@@ -126,7 +123,7 @@ def add_supplier_page(main):
             phone_entry.delete(0, tk.END)
             email_entry.delete(0, tk.END)
             address_entry.delete(0, tk.END)
-            load_suppliers()  # ယခုအခါ အထက်တွင် ရှိနေသဖြင့် ခေါ်၍ရသွားပါပြီ
+            load_suppliers() 
         else:
             messagebox.showerror("Error", "Failed to add supplier. Name might already exist or Database table error!")
 
@@ -136,12 +133,11 @@ def add_supplier_page(main):
     ).pack(anchor="center", pady=5)
 
 
-    # ==================== 🛠️ EDIT & DELETE BUTTONS AREA ====================
-    # ညာဘက် List Table ရဲ့ အောက်ခြေ အလယ်တည့်တည့်မှာ ကပ်ထားရန် Frame
+    # ==================== EDIT & DELETE BUTTONS AREA ====================
     action_btn_frame = tk.Frame(right_frame, bg="white")
     action_btn_frame.pack(anchor="center", pady=10) 
 
-    # ၁။ Edit function
+    # Edit function
     def edit_supplier():
         selected = tree.focus()
         if not selected:
@@ -216,7 +212,7 @@ def add_supplier_page(main):
 
             u_cleaned_phone = re.sub(r'[\s\s-]', '', u_phone)
 
-            # Database Update လုပ်ခြင်း
+            # Database Update 
             from database import db
             try:
                 with db() as conn:
@@ -238,14 +234,14 @@ def add_supplier_page(main):
             bg="#2ecc71", fg="white", relief="flat", command=update_supplier_save, cursor="hand2", padx=15, pady=4
         ).pack(anchor="center", pady=10)
 
-    # 📝 Edit Button (ဘယ်ဘက်ကပ်လျက်)
+    #  Edit Button
     tk.Button(
         action_btn_frame, text="📝 Edit Selected", font=("Segoe UI", 10, "bold"), 
         bg="#f1c40f", fg="white", relief="flat", command=edit_supplier, cursor="hand2", padx=15, pady=5
     ).pack(side="left", padx=10)
 
 
-    # ၂။ Delete function
+    #  Delete function
     def delete_supplier():
         selected = tree.focus()
         if not selected:
@@ -263,11 +259,10 @@ def add_supplier_page(main):
             else:
                 messagebox.showerror("Error", "Failed to delete supplier.")
 
-    # 🗑 Delete Button (ညာဘက်ကပ်လျက်)
+    # Delete Button
     tk.Button(
         action_btn_frame, text="🗑 Delete Selected", font=("Segoe UI", 10, "bold"), 
         bg="#e74c3c", fg="white", relief="flat", command=delete_supplier, cursor="hand2", padx=15, pady=5
     ).pack(side="left", padx=10)
 
-    # စာမျက်နှာစဖွင့်ချင်း ဇယားထဲ ဒေတာတင်ရန်
     load_suppliers()

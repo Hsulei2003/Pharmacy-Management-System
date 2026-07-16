@@ -11,29 +11,29 @@ from login import LoginWindow
 
 create_table()
 
-def show_main_window():
+def show_main_window(user_id):
+
     # ---------- MAIN WINDOW ----------
     root = tk.Tk()
     root.title("Pharmacy Management System")
     root.geometry("1000x600")
-    root.config(bg="#f8f9fa")
+    root.config(bg="#faf8f9")
     root.iconbitmap("app_icon.ico")
     
-    # Maximize ချဲ့လိုရအောင် ဖွင့်ထားပေးပါသည်
+    # Maximize
     root.resizable(True, True) 
 
-    # Log Out ပြုလုပ်မည့် လုပ်ဆောင်ချက်
     def logout():
         root.destroy()
         login_app = LoginWindow(on_success=show_main_window)
         login_app.run()
 
-    # ဘယ်ဘက် Sidebar
+    # Left Sidebar
     sidebar = tk.Frame(root, bg="#2c3e50", width=220)
     sidebar.pack(side="left", fill="y")
     sidebar.pack_propagate(False)
 
-    # 🌟 ညာဘက် Main Content Area (ဒီနေရာမှာ pack ဖြင့် Screen အပြည့် လိုက်ချဲ့ခိုင်းလိုက်ပါပြီ)
+    # Right Main Content Area 
     main = tk.Frame(root, bg="#f8f9fa")
     main.pack(side="right", expand=True, fill="both")
 
@@ -61,14 +61,12 @@ def show_main_window():
 
     # ---------- SIDEBAR BUTTONS ----------
     def create_sidebar_btn(icon, text_str, cmd):
-        # ခလုတ်နောက်ခံ Frame
+        # btn background frame
         btn_frame = tk.Frame(sidebar, bg="#34495e", cursor="hand2")
         
-        # ၁။ ရှေ့က Icon ပြမည့် Label (width=3 လို ပုံသေကန့်သတ်ပြီး အလယ်တည့်တည့် ထားပါတယ်)
         icon_lbl = tk.Label(btn_frame, text=icon, font=("Segoe UI", 12), fg="#ecf0f1", bg="#34495e", width=3, anchor="center")
         icon_lbl.pack(side="left", padx=(15, 0))
         
-        # ၂။ ဘေးက စာသားပြမည့် Label (ဘယ်ဘက်ကို ကပ်ထားလို Icon ကြီးပေမယ့် စာသားက တစ်တန်းတည်း ညီနေမှာပါ)
         text_lbl = tk.Label(btn_frame, text=text_str, font=("Segoe UI", 11, "bold"), fg="#ecf0f1", bg="#34495e", anchor="w")
         text_lbl.pack(side="left", fill="x", expand=True, padx=(5, 10))
         
@@ -79,8 +77,8 @@ def show_main_window():
             widget.bind("<Leave>", lambda e, f=btn_frame, i=icon_lbl, t=text_lbl: [f.config(bg="#34495e"), i.config(bg="#34495e"), t.config(bg="#34495e")])
             
         return btn_frame
-
-    # ခလုတ်များကို Sidebar ထဲသို တစ်ခုချင်းစီ အချိုးကျ ထည့်သွင်းခြင်း
+    
+    # ----- Sidebar Buttons --------
     btn_dashboard = create_sidebar_btn("📊", "Dashboard", lambda: dashboard(main))
     btn_dashboard.pack(pady=8, fill="x", padx=10, ipady=6)
 
@@ -99,10 +97,9 @@ def show_main_window():
     btn_scan = create_sidebar_btn("🛍", "Scan & Sell", lambda: scan_page(main))
     btn_scan.pack(pady=8, fill="x", padx=10, ipady=6)
 
-    btn_account = create_sidebar_btn("⚙️", "Account Settings", lambda: account_page(main))
+    btn_account = create_sidebar_btn("⚙️", "Account Settings", lambda: account_page(main, user_id))
     btn_account.pack(pady=8, fill="x", padx=10, ipady=6)
 
-    # Sidebar ရဲ့ အောက်ခြေအဆုံးတွင် ပေါ်မည့် Log Out ခလုတ်လေး
     logout_btn = tk.Button(
         sidebar, 
         text="🚪 Log Out", 
@@ -119,7 +116,6 @@ def show_main_window():
     )
     logout_btn.pack(pady=15, ipady=6, side="bottom")
 
-    # စဖွင့်ချင်း Dashboard ကို ပြခိုင်းထားခြင်း
     dashboard(main)
 
     root.mainloop()

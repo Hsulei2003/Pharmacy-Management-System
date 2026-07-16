@@ -4,132 +4,123 @@ from tkinter import ttk, messagebox
 from logic import get_status
 from utils import clear
 
-# ---------- SCAN + SELL ----------
+# ---------- SCAN + SELL (POS VERSION) ----------
 def scan_page(main):
     clear(main)
     main.config(bg="#f8f9fa")
 
-    # ခေါင်းစဉ်
     tk.Label(
         main, 
-        text="Scan & Sell Medicines (Batch System)", 
+        text="🛍 Point of Sale (POS) & Billing System", 
         font=("Segoe UI", 22, "bold"), 
         fg="#2c3e50", 
         bg="#f8f9fa"
     ).pack(pady=15)
 
-    # ===== ၁။ CANVAS ဖြင့် ထောင့်ကွေး PANEL ဆောက်ခြင်း =====
     card_width = 540
-    card_height = 360  
+    card_height = 630  # Cart ဆံ့အောင် Panel ကို အောက်သို ချဲ့ထားသည်
 
     sell_card = tk.Canvas(main, width=card_width, height=card_height, bg="#f8f9fa", highlightthickness=0)
-    sell_card.pack(pady=10)
+    sell_card.pack(pady=5)
 
-    # ထောင့်ကွေးစတုဂံဆွဲသည့် Function
     def draw_rounded_rect(canvas, x1, y1, x2, y2, radius, **kwargs):
         points = [x1+radius, y1, x1+radius, y1, x2-radius, y1, x2-radius, y1, x2, y1, x2, y1+radius, x2, y1+radius, x2, y2-radius, x2, y2-radius, x2, y2, x2-radius, y2, x2-radius, y2, x1+radius, y2, x1+radius, y2, x1, y2, x1, y2-radius, x1, y2-radius, x1, y1+radius, x1, y1+radius, x1, y1]
         return canvas.create_polygon(points, **kwargs, smooth=True)
 
-    # ကတ်ပြားနောက်ခံအဖြူရောင်ကို ထောင့်ကွေး (Radius=20) ဖြင့် ဆွဲခြင်း
     draw_rounded_rect(sell_card, 5, 5, card_width-5, card_height-5, radius=20, fill="white", outline="#e0e0e0", width=1)
+    sell_card.create_text(35, 30, text="POS Cashier Panel", font=("Segoe UI", 12, "bold"), fill="#34495e", anchor="w")
 
-    # Panel ခေါင်းစဉ်စာသား
-    sell_card.create_text(35, 30, text="Transaction Panel", font=("Segoe UI", 12, "bold"), fill="#34495e", anchor="w")
-
-    # Styles
     lbl_style = {"bg": "white", "font": ("Segoe UI", 11), "fg": "#34495e"}
     ent_style = {"font": ("Segoe UI", 11), "relief": "solid", "bd": 1}
-
-    # ===== ၂။ CONTROL များကို CANVAS ပေါ်တွင် နေရာချခြင်း =====
     
     # Row 0: Barcode Input
     lbl_scan = tk.Label(sell_card, text="Scan Barcode", **lbl_style)
-    sell_card.create_window(35, 80, window=lbl_scan, anchor="w")
-    
-    scan_entry = tk.Entry(sell_card, width=25, **ent_style)
-    sell_card.create_window(175, 80, window=scan_entry, anchor="w")
+    sell_card.create_window(35, 75, window=lbl_scan, anchor="w")
+    scan_entry = tk.Entry(sell_card, width=23, **ent_style)
+    sell_card.create_window(165, 75, window=scan_entry, anchor="w")
     scan_entry.focus()
 
     # Row 1: Quantity Input
-    lbl_qty = tk.Label(sell_card, text="Quantity to Sell", **lbl_style)
-    sell_card.create_window(35, 130, window=lbl_qty, anchor="w")
-    
-    qty_entry = tk.Entry(sell_card, width=25, **ent_style)
+    lbl_qty = tk.Label(sell_card, text="Quantity to Add", **lbl_style)
+    sell_card.create_window(35, 120, window=lbl_qty, anchor="w")
+    qty_entry = tk.Entry(sell_card, width=23, **ent_style)
     qty_entry.insert(0, "1")
-    sell_card.create_window(175, 130, window=qty_entry, anchor="w")
+    sell_card.create_window(165, 120, window=qty_entry, anchor="w")
 
-    # Row 2: Result Area
+    # Row 2: Result Verification Area
     result_frame = tk.Frame(sell_card, bg="#f8f9fa", relief="solid", bd=1)
-    sell_card.create_window(270, 210, window=result_frame, anchor="center", width=470, height=60)
+    sell_card.create_window(270, 185, window=result_frame, anchor="center", width=470, height=50)
 
     result_frame.grid_columnconfigure(0, weight=1)
     result_frame.grid_columnconfigure(3, weight=1)
     result_frame.grid_rowconfigure(0, weight=1)
 
-    icon_label = tk.Label(result_frame, text="🔍", font=("Segoe UI", 13), fg="#7f8c8d", bg="#f8f9fa", anchor="center")
-    icon_label.grid(row=0, column=1, padx=(0, 8), sticky="nsew") 
+    icon_label = tk.Label(result_frame, text="🔍", font=("Segoe UI", 12), fg="#7f8c8d", bg="#f8f9fa", anchor="center")
+    icon_label.grid(row=0, column=1, padx=(10, 8), sticky="w") 
 
     result = tk.Label(
-        result_frame, 
-        text="Please scan a medicine barcode...", 
-        font=("Segoe UI", 11, "italic"), 
-        fg="#7f8c8d", 
-        bg="#f8f9fa",
-        anchor="w",
-        justify= "left"
+        result_frame, text="Waiting for barcode scan...", 
+        font=("Segoe UI", 10, "italic"), fg="#7f8c8d", bg="#f8f9fa", anchor="w"
     )
-    result.grid(row=0, column=2, padx=(0, 0), sticky="nsew")
+    result.grid(row=0, column=2, sticky="w")
 
-    # Barcode သိမ်းရန် string ဆောက်ထားမည်
-    scanned_barcode = tk.StringVar()
+    # Local Variable Variables for temporary match
+    current_med_data = {} 
 
-    # =================================================================
-    # --- 🛠 Scan စစ်ဆေးသည့် Logic (စတော့ပြတ်/သက်တမ်းကုန် သတ်သတ်စီပြသခြင်း) ---
-    # =================================================================
+    # --- Grand Total Update Function ---
+    def update_grand_total():
+        total = 0
+        for item in cart_tree.get_children():
+            total += int(cart_tree.item(item)['values'][4]) # Total Price က column index 4 မှာရှိသည်
+        lbl_total.config(text=f"Grand Total: {total:,} Ks")
+
+    # --- Barcode Verification Logic ---
     def check_barcode_data(code):
-        if not code:
-            return
-
+        if not code: return
         try:
             import datetime
             current_date = datetime.date.today().strftime("%Y-%m-%d")
-            
             conn = db()
             c = conn.cursor()
             
-            # ၁။ ဆေးအချက်အလက် ရှိမရှိ အရင်ရှာခြင်း
-            c.execute("SELECT id, name, barcode FROM medicines WHERE barcode=?", (code,))
-            med_info = c.fetchone()
-            
-            if not med_info:
-                scanned_barcode.set("")
+            # ဆေးဝါးအချက်အလက်နှင့် unit_price ကိုပါဆွဲထုတ်ခြင်း (မရှိလျှင် 0 ဟု ယူဆ)
+            try:
+                c.execute("SELECT id, name, barcode, unit_price FROM medicines WHERE barcode=?", (code,))
+                med_info = c.fetchone()
+            except:
+                c.execute("SELECT id, name, barcode, 0 FROM medicines WHERE barcode=?", (code,))
+                med_info = c.fetchone()
                 
-                # 🌟 ဤနေရာတွင် ဆေးဝါးရှာမတွေ့ပါက သတိပေးသံမြည်အောင် ကုဒ်ထည့်သွင်းခြင်း
+            if not med_info:
+                current_med_data.clear()
                 import threading
                 from pygame import mixer
                 def play_warning():
                     try:
                         mixer.init()
-                        sound = mixer.Sound("error.mp3") # 👈 မိတ်ဆွေသုံးထားတဲ့ အသံဖိုင်နာမည်ထည့်ရန်
+                        sound = mixer.Sound("error.mp3") 
                         sound.play()
                     except: pass
                 threading.Thread(target=play_warning, daemon=True).start()
 
-                icon_label.config(text="❌", font=("Segoe UI", 20), fg="#c0392b")
-                result.config(text=" Medicine Not Found!", font=("Segoe UI", 11, "bold"), fg="#c0392b", anchor="center")
-                sell_btn.config(state="disabled", bg="#95a5a6")
+                icon_label.config(text="❌", fg="#c0392b")
+                result.config(text=" Medicine Not Found!", font=("Segoe UI", 11, "bold"), fg="#c0392b")
+                add_to_cart_btn.config(state="disabled", bg="#95a5a6")
                 conn.close()
                 return
 
-            med_id, name, barcode = med_info
-            scanned_barcode.set(barcode)
+            med_id, name, barcode, unit_price = med_info
+            if unit_price is None: unit_price = 0
 
-            # ၂။ ရှိသမျှ Batch အားလုံး၏ စတော့စုစုပေါင်းကို တွက်ခြင်း
-            c.execute("SELECT SUM(qty) FROM medicine_batches WHERE medicine_id = ?", (med_id,))
+            # 🌟 [ပြင်ဆင်လိုက်သည်] သက်တမ်းမကုန်သေးဘဲ (expiry >= current_date) အမှန်တကယ်ရောင်းရမည့် Stock စုစုပေါင်းကိုပဲ တွက်ချက်ခြင်း
+            c.execute("""
+                SELECT SUM(qty) FROM medicine_batches 
+                WHERE medicine_id = ? AND expiry >= ?
+            """, (med_id, current_date))
             total_stock_row = c.fetchone()
             total_stock = total_stock_row[0] if total_stock_row and total_stock_row[0] is not None else 0
 
-            # ၃။ သက်တမ်းမကုန်သေးဘဲ စတော့ကျန်ရှိသော Active အနီးစပ်ဆုံးရက်ကို တွက်ခြင်း
+            # သက်တမ်းမကုန်သေးဘဲ stockကျန်ရှိသော Active အနီးစပ်ဆုံးရက်ကို တွက်ခြင်း
             c.execute("""
                 SELECT MIN(expiry) FROM medicine_batches 
                 WHERE medicine_id = ? AND qty > 0 AND expiry >= ?
@@ -144,20 +135,25 @@ def scan_page(main):
 
                 icon_label.config(text=" ", font=("Segoe UI", 13), fg=text_color)
                 
-                # display_name = name
-                # if len(display_name) > 18:
-                #     display_name = display_name[:15] + "..."
-                    
+                # 🌟 ဒေတာဘေ့စ်ထဲမှ ဈေးနှုန်း format အမှားမတက်စေရန် ကော်မာသေချာဖြတ်ပြီး စာသားပုံစံ ပြင်ဆင်လိုက်ပါသည်
+                formatted_price = f"{int(unit_price):,}" if str(unit_price).isdigit() else str(unit_price)
+
+                # 🌟 လွဲမှားနေသော String Operator (|) ကို ဖယ်ရှားပြီး f-string တစ်ခုတည်းအဖြစ် စနစ်တကျ ပြောင်းလဲလိုက်ပါသည်
                 result.config(
-                    text=f"{name}  |  Available Stock: {total_stock}  |\n  Nearest Exp: {active_expiry}",
-                    font=("Segoe UI", 12, "bold"),
+                    text=f"{name}  |  Available Stock: {total_stock}  |\nNearest Exp: {active_expiry}  |  Price: {formatted_price} Ks",
+                    font=("Segoe UI", 11, "bold"),
                     fg=text_color,
-                    justify="center"
+                    justify="left"
                 )
-                sell_btn.config(state="normal", bg="#e74c3c") # အရောင်းခလုတ်ဖွင့်မည်
                 
+                # Add to Cart သုံးနိုင်ရန် လက်ရှိဆေးအချက်အလက်ကို သိမ်းဆည်းခြင်း
+                current_med_data.update({
+                    "id": med_id, "name": name, "barcode": barcode, 
+                    "unit_price": int(unit_price) if str(unit_price).isdigit() else 0, 
+                    "stock": total_stock
+                })
+                add_to_cart_btn.config(state="normal", bg="#3498db")
             else:
-                # Active Stock မရှိပါက (စတော့ပြတ်တာလား သိုမဟုတ် သက်တမ်းကုန်တာလား သပ်သတ်စီ ခွဲပြမည်)
                 import threading
                 from pygame import mixer
                 def play_warning():
@@ -168,7 +164,7 @@ def scan_page(main):
                     except: pass
                 threading.Thread(target=play_warning, daemon=True).start()
 
-                icon_label.config(text="❌", font=("Segoe UI", 20), fg="#c0392b")
+                icon_label.config(text="❌", font=("Segoe UI", 17), fg="#c0392b")
                 
                 if total_stock <= 0:
                     error_msg = f"{name} is Out of Stock!"
@@ -176,23 +172,18 @@ def scan_page(main):
                     error_msg = f"{name} is Expired!"
 
                 result.config(text=error_msg, font=("Segoe UI", 11, "bold"), fg="#c0392b", justify="center")
-                sell_btn.config(state="disabled", bg="#95a5a6") 
+                add_to_cart_btn.config(state="disabled", bg="#95a5a6") 
 
             conn.close()
                 
         except Exception as e:
             messagebox.showerror("Scan Error", f"Something went wrong while scanning:\n{e}")
 
-    # Text Box ထဲ စာရိုက်ပြီး Enter ခေါက်လျှင် စစ်ဆေးပေးမည့် စနစ်
     scan_entry.bind("<Return>", lambda e: check_barcode_data(scan_entry.get().strip()))
-
-    # --- Webcam ဖွင့်ပြီး စကင်ဖတ်မည့် အစိတ်အပိုင်း ---
     def trigger_scan():
         import cv2
         from scanner import BarcodeScanner
-        
-        scan_btn.config(state="disabled")
-        result.config(text="📷 Webcam Opening... Please wait.", fg="#3498db")
+        result.config(text="📷 Webcam Opening...", fg="#3498db")
         scanner = BarcodeScanner()
         cap = cv2.VideoCapture(0)
         scanned_code = None
@@ -200,159 +191,192 @@ def scan_page(main):
         while True:
             ret, frame = cap.read()
             if not ret: break
-                
             frame = cv2.flip(frame, 1) 
             res = scanner.scan_from_frame(frame)
             if res:
+                import winsound
+                winsound.Beep(2000, 150)
                 scanned_code = res
                 break
-                
             cv2.imshow(window_name, frame)
             key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'): break
+
+            if key == ord('q'):
+                break
+
             try:
-                if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1: break
-            except: break
-                
+                if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
+                    break
+            except:
+                break
         cap.release()
         cv2.destroyAllWindows()
-        scan_btn.config(state="normal")
 
         if scanned_code:
             scan_entry.delete(0, tk.END)
             scan_entry.insert(0, scanned_code)
             check_barcode_data(scanned_code)
         else:
-            icon_label.config(text="❌", font=("Segoe UI", 24), fg="#e67e22")
-            result.config(text="Scan cancelled or no barcode detected.", font=("Segoe UI", 11, "bold"), fg="#e67e22")
+            result.config(text="Scan cancelled.", fg="#e67e22")
 
-    # =================================================================
-    # --- 🛠 အရောင်းသိမ်းဆည်းပြီး FIFO စနစ်ဖြင့် စတော့လျှော့ချမည့် Logic ---
-    # =================================================================
-    def sell():
-        code_to_sell = scanned_barcode.get()
-        if not code_to_sell:
-            icon_label.config(text="❌", font=("Segoe UI", 24), fg="#e67e22")
-            result.config(text="Please scan a medicine first!", font=("Segoe UI", 11, "bold"), fg="#e67e22")
+    # --- Add To Cart Logic ---
+    def add_to_cart():
+        if not current_med_data: return
+        qty_in = qty_entry.get().strip()
+        if not qty_in.isdigit() or int(qty_in) <= 0:
+            messagebox.showwarning("Warning", "Quantity must be a valid positive number!")
             return
-            
-        qty_input = qty_entry.get().strip()
-        if not qty_input.isdigit():
-            icon_label.config(text="❌", font=("Segoe UI", 24), fg="#c0392b")
-            result.config(text="Invalid quantity! Numbers only.", font=("Segoe UI", 11, "bold"), fg="#c0392b")
+        
+        req_qty = int(qty_in)
+        if req_qty > current_med_data["stock"]:
+            messagebox.showerror("Stock Limit", f"Not enough stock! Only {current_med_data['stock']} items available.")
             return
+
+        # Cart Treeview ထဲတွင် ရှိပြီးသားလား စစ်ဆေးခြင်း
+        for item in cart_tree.get_children():
+            values = cart_tree.item(item)['values']
+            if str(values[0]) == str(current_med_data["barcode"]):
+                new_qty = int(values[2]) + req_qty
+                if new_qty > current_med_data["stock"]:
+                    messagebox.showerror("Stock Limit", "Combined quantity exceeds available stock!")
+                    return
+                new_total = new_qty * int(values[3])
+                cart_tree.item(item, values=(values[0], values[1], new_qty, values[3], new_total, current_med_data["id"]))
+                update_grand_total()
+                clear_inputs()
+                return
             
-        sell_qty = int(qty_input)
-        if sell_qty <= 0:
-            icon_label.config(text="❌", font=("Segoe UI", 24), fg="#c0392b")
-            result.config(text="Quantity must be greater than 0!", font=("Segoe UI", 11, "bold"), fg="#c0392b")
+        # Cart ထဲသို အသစ်ထည့်ခြင်း
+        total_p = req_qty * current_med_data["unit_price"]
+        cart_tree.insert("", "end", values=(
+            current_med_data["barcode"], current_med_data["name"], 
+            req_qty, current_med_data["unit_price"], total_p, current_med_data["id"]
+        ))
+        update_grand_total()
+        clear_inputs()
+
+    def clear_inputs():
+        scan_entry.delete(0, tk.END)
+        qty_entry.delete(0, tk.END)
+        qty_entry.insert(0, "1")
+        result.config(text="Waiting for next scan...", fg="#7f8c8d", font=("Segoe UI", 10, "italic"))
+        icon_label.config(text="🔍", fg="#7f8c8d")
+        add_to_cart_btn.config(state="disabled", bg="#95a5a6")
+        current_med_data.clear()
+        scan_entry.focus()
+
+    # --- Cancel Selected Item ---
+    def remove_item():
+        selected = cart_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select an item from the cart to remove!")
+            return
+        cart_tree.delete(selected)
+        update_grand_total()
+
+    # --- Checkout / Checkout Done (FIFO Logic) ---
+    def checkout():
+        if not cart_tree.get_children():
+            messagebox.showwarning("Warning", "Your shopping cart is empty!")
+            return
+
+        if not messagebox.askyesno("Confirm Sale", "Are you sure you want to complete this transaction?"):
             return
 
         try:
             import datetime
             current_date = datetime.date.today().strftime("%Y-%m-%d")
-            
             conn = db()
             c = conn.cursor()
-            
-            # ၁။ ဆေး၏ သက်တမ်းမကုန်သေးသော (Active) စတော့ကျန်ရှိမှုကို စစ်ဆေးခြင်း
-            c.execute("""
-                SELECT m.id, m.name, SUM(b.qty) 
-                FROM medicines m
-                JOIN medicine_batches b ON m.id = b.medicine_id
-                WHERE m.barcode = ? AND b.qty > 0 AND b.expiry >= ?
-                GROUP BY m.id
-            """, (code_to_sell, current_date))
-            row = c.fetchone()
-            
-            if not row:
-                icon_label.config(text="❌", font=("Segoe UI", 24), fg="#c0392b")
-                result.config(text="No active stock available to sell!", font=("Segoe UI", 11, "bold"), fg="#c0392b")
-                conn.close()
-                return
-            
-            med_id, name, total_available = row
 
-            if total_available < sell_qty:
-                icon_label.config(text="❌", font=("Segoe UI", 20), fg="#c0392b")
-                result.config(text=f"Not enough active stock! Only {total_available} items left.", font=("Segoe UI", 11, "bold"), fg="#c0392b")
-                conn.close()
-                return
-
-            # ၂။ 🌟 FIFO (First Expired, First Out) အရောင်းစနစ် - သက်တမ်းမကုန်သေးသော ဘတ်ချ်များကိုသာ နှုတ်မည်
-            c.execute("""
-                SELECT qty, batch_number FROM medicine_batches 
-                WHERE medicine_id = ? AND qty > 0 AND expiry >= ?
-                ORDER BY expiry ASC
-            """, (med_id, current_date))
-            batches = c.fetchall()
-            remaining_to_sell = sell_qty
-            
-            for batch in batches:
-                batch_qty, batch_no = batch
-                if remaining_to_sell <= 0: break
+            for item in cart_tree.get_children():
+                vals = cart_tree.item(item)['values']
+                med_id = vals[5]
+                sell_qty = int(vals[2])
                 
-                if batch_qty >= remaining_to_sell:
-                    new_batch_qty = batch_qty - remaining_to_sell
-                    c.execute("""
-                        UPDATE medicine_batches 
-                        SET qty = ? 
-                        WHERE medicine_id = ? AND batch_number = ?
-                    """, (new_batch_qty, med_id, batch_no))
-                    remaining_to_sell = 0
-                else:
-                    remaining_to_sell -= batch_qty
-                    c.execute("""
-                        UPDATE medicine_batches 
-                        SET qty = 0 
-                        WHERE medicine_id = ? AND batch_number = ?
-                    """, (med_id, batch_no))
+                # FIFO စနစ်အရ သက်တမ်းမကုန်သေးသော active batch များကို သက်တမ်းအလိုက် (expiry ASC) စီယူခြင်း
+                # 🌟 Expiry ရက်စွဲကိုပါ UPDATE မှာ သုံးနိုင်အောင် SQL Query ထဲတွင် expiry ကိုပါ ဆွဲထုတ်ခိုင်းလိုက်ပါတယ်
+                c.execute("""
+                    SELECT qty, batch_number, expiry FROM medicine_batches 
+                    WHERE medicine_id = ? AND qty > 0 AND expiry >= ?
+                    ORDER BY expiry ASC
+                """, (med_id, current_date))
+                batches = c.fetchall()
+                rem = sell_qty
+
+                for batch in batches:
+                    b_qty, b_no, b_exp = batch # 🌟 b_exp (expiry date) ကိုပါ variable ထဲ ထည့်ယူလိုက်ပါတယ်
+                    if rem <= 0: break
+                    
+                    if b_qty >= rem:
+                        # Batch နံပါတ် တူနေရင်တောင် Expiry ပါ ကိုက်ညီမှ နှုတ်ရန် AND expiry = ? ထည့်သွင်းထားပါတယ်
+                        c.execute("""
+                            UPDATE medicine_batches 
+                            SET qty = qty - ? 
+                            WHERE medicine_id = ? AND batch_number = ? AND expiry = ?
+                        """, (rem, med_id, b_no, b_exp))
+                        rem = 0
+                    else:
+                        rem -= b_qty
+                        # 🌟 Batch နံပါတ် တူနေရင်တောင် Expiry ပါ ကိုက်ညီမှ 0 လုပ်ရန် AND expiry = ? ထည့်သွင်းထားပါတယ်
+                        c.execute("""
+                            UPDATE medicine_batches 
+                            SET qty = 0 
+                            WHERE medicine_id = ? AND batch_number = ? AND expiry = ?
+                        """, (med_id, b_no, b_exp))
 
             conn.commit()
             conn.close()
+            messagebox.showinfo("Success", "Transaction Complete! Stock deducted from oldest batches.")
             
-            # အောင်မြင်ကြောင်း ပြသခြင်း
-            messagebox.showinfo("Success", f"Successfully sold {sell_qty} {name}!\nStock deducted from oldest active batch.")
-            
-            # UI ပြန်လည်ရှင်းလင်းခြင်း
-            scan_entry.delete(0, tk.END)
-            qty_entry.delete(0, tk.END)
-            qty_entry.insert(0, "1")
-            scanned_barcode.set("")
-            
-            icon_label.config(text="🔍", font=("Segoe UI", 11), fg="#7f8c8d")
-            result.config(text="Transaction complete. Waiting for next scan...", font=("Segoe UI", 11, "italic"), fg="#7f8c8d")
-            sell_btn.config(state="disabled", bg="#95a5a6")
-                
-        except Exception as e:
-            messagebox.showerror("Database Error", f"Failed to update stock in database:\n{e}")
+            # Reset Cart
+            for item in cart_tree.get_children(): cart_tree.delete(item)
+            update_grand_total()
+            clear_inputs()
 
-    # Scan Button ကို နေရာချခြင်း
-    scan_btn = tk.Button(
-        sell_card, 
-        text="🔍 Scan", 
-        font=("Segoe UI", 10, "bold"), 
-        bg="#2ecc71", 
-        fg="white", 
-        relief="flat", 
-        command=trigger_scan, 
-        cursor="hand2",
-        padx=12
-    )
-    sell_card.create_window(395, 80, window=scan_btn, anchor="w")
+        except Exception as e:
+            messagebox.showerror("Database Error", f"Checkout failed:\n{e}")
+
+    # BUTTONS PANEL
+    scan_btn = tk.Button(sell_card, text="🔍 Scan", font=("Segoe UI", 10, "bold"), bg="#2ecc71", fg="white", relief="flat", command=trigger_scan, cursor="hand2", padx=8)
+    sell_card.create_window(375, 75, window=scan_btn, anchor="w")
+
+    add_to_cart_btn = tk.Button(sell_card, text="➕ Add to Cart", font=("Segoe UI", 10, "bold"), bg="#95a5a6", fg="white", relief="flat", state="disabled", command=add_to_cart, cursor="hand2", padx=8)
+    sell_card.create_window(375, 120, window=add_to_cart_btn, anchor="w")
+
+    # ===== DYNAMIC CART TREEVIEW PANEL =====
+    tree_frame = tk.Frame(sell_card, bg="white")
+    sell_card.create_window(270, 365, window=tree_frame, width=470, height=260)
+
+    style = ttk.Style()
+    style.configure("Treeview", font=("Segoe UI", 10), rowheight=25)
+    style.configure("Treeview.Heading", font=("Segoe UI", 10, "bold"))
+
+    cart_tree = ttk.Treeview(tree_frame, columns=("barcode", "name", "qty", "price", "total", "med_id"), show="headings")
+    cart_tree.heading("barcode", text="Barcode")
+    cart_tree.heading("name", text="Medicine Name")
+    cart_tree.heading("qty", text="Qty")
+    cart_tree.heading("price", text="Price")
+    cart_tree.heading("total", text="Total")
     
-    # Sell Button ကို နေရာချခြင်း
-    sell_btn = tk.Button(
-        sell_card, 
-        text="🛍 Sell Now", 
-        font=("Segoe UI", 11, "bold"), 
-        bg="#95a5a6", 
-        fg="white", 
-        relief="flat", 
-        state="disabled",
-        cursor="hand2",
-        command=sell, 
-        padx=35,
-        pady=5
-    )
-    sell_card.create_window(270, 310, window=sell_btn, anchor="center")
+    cart_tree.column("barcode", width=85, anchor="center")
+    cart_tree.column("name", width=155, anchor="w")
+    cart_tree.column("qty", width=40, anchor="center")
+    cart_tree.column("price", width=80, anchor="e")
+    cart_tree.column("total", width=90, anchor="e")
+    cart_tree.column("med_id", width=0, minwidth=0, stretch=tk.NO) # Hidden ID column
+    # 🌟 Cart ထဲမှာ ဆေးအရမ်းများလာလျှင် အသုံးပြုရန် Scrollbar စနစ်
+    scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=cart_tree.yview)
+    cart_tree.configure(yscrollcommand=scrollbar.set)
+    scrollbar.pack(side="right", fill="y") # ညာဘက်ဘေးတွင် ကပ်ထားမည်
+    cart_tree.pack(fill="both", expand=True)
+
+    # ===== LOWER FOOTER CONTROLS =====
+    lbl_total = tk.Label(sell_card, text="Grand Total: 0 Ks", font=("Segoe UI", 14, "bold"), fg="#2c3e50", bg="white")
+    sell_card.create_window(35, 520, window=lbl_total, anchor="w")
+
+    remove_btn = tk.Button(sell_card, text="❌ Cancel Item", font=("Segoe UI", 10, "bold"), bg="#e67e22", fg="white", relief="flat", command=remove_item, cursor="hand2", padx=10)
+    sell_card.create_window(468, 520, window=remove_btn, anchor="e")
+
+    checkout_btn = tk.Button(sell_card, text="🛍 Confirm Sell & Print Bill", font=("Segoe UI", 12, "bold"), bg="#2e7d32", fg="white", relief="flat", command=checkout, cursor="hand2", padx=40, pady=6)
+    sell_card.create_window(270, 580, window=checkout_btn, anchor="center")

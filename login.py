@@ -14,7 +14,6 @@ class LoginWindow:
         self.root.resizable(False, False)
         self.root.iconbitmap("app_icon.ico")
         
-        # Screen ရဲ့ အလယ်တည့်တည့်မှာ Window ပွင့်စေရန်
         self.root.eval('tk::PlaceWindow . center')
 
         # Main Container Frame (ဘေးပတ်ပတ်လည် နေရာလွတ်ချန်ရန်)
@@ -40,7 +39,7 @@ class LoginWindow:
             bg="white",
             highlightthickness=0
         )
-        self.username_entry.pack(fill="x", pady=(5, 15), ipady=6) # ipady က entry boxကို ပိုမိုအမြင့်ကြီးစေပါတယ်
+        self.username_entry.pack(fill="x", pady=(5, 15), ipady=6) 
         self.username_entry.focus()
 
         # Password Field
@@ -72,7 +71,7 @@ class LoginWindow:
         )
         self.login_btn.pack(fill="x", ipady=8)
 
-        # Enter ခလုတ်နှိပ်ရင်လည်း Login ဝင်လို့ရအောင် ချိတ်ဆက်ခြင်း
+        # To login by pressing enter
         self.root.bind('<Return>', lambda event: self.check_login())
 
     def check_login(self):
@@ -91,8 +90,9 @@ class LoginWindow:
             conn.close()
 
             if user:
+                current_user_id = user[0] #ရလာတဲ့ User ID (ဥပမာ- 1) ကို မှတ်လိုက်တယ်
                 self.root.destroy()
-                self.on_success()
+                self.on_success(current_user_id) #Main app ဆီကို ID ပို့လိုက်တယ်
             else:
                 messagebox.showerror("Error", "Incorrect Username or Password!")
                 

@@ -5,7 +5,6 @@ import sqlite3
 from utils import clear
 
 def add_category_page(main):
-    # ၁။ စာမျက်နှာဟောင်းများကို ဖယ်ရှားခြင်း
     clear(main)
     main.config(bg="#f8f9fa")
 
@@ -17,13 +16,11 @@ def add_category_page(main):
         bg="#f8f9fa"
     ).pack(pady=15)
 
-    # 🌟 [ပင်မ Container Frame] - ဘယ်/ညာ Panel နှစ်ခုကို ကပ်ထားမည့် နေရာ
+    # Main Container Frame
     main_container = tk.Frame(main, bg="#f8f9fa")
     main_container.pack(fill="both", expand=True, padx=20, pady=10)
 
-    # =================================================================
-    # 👈 ဘယ်ဘက် Panel: ADD CATEGORY FORM
-    # =================================================================
+    # Left Panel: ADD CATEGORY FORM
     left_panel = tk.LabelFrame(
         main_container, 
         text="Add New Category", 
@@ -46,9 +43,7 @@ def add_category_page(main):
     cat_entry = tk.Entry(left_panel, font=("Segoe UI", 12), relief="solid", bd=1)
     cat_entry.pack(fill="x", padx=20, pady=5, ipady=4)
 
-    # =================================================================
-    # 👉 ညာဘက် Panel: CATEGORY LIST
-    # =================================================================
+    # Right Panel: CATEGORY LIST
     right_panel = tk.LabelFrame(
         main_container, 
         text="Existing Categories", 
@@ -67,7 +62,7 @@ def add_category_page(main):
     scrollbar = ttk.Scrollbar(tree_frame)
     scrollbar.pack(side="right", fill="y")
 
-    # Treeview Style မြှင့်တင်ထားခြင်း
+    # Treeview Style
     cat_style = ttk.Style()
     cat_style.theme_use("clam")
     cat_style.configure("Cat.Treeview", font=("Segoe UI", 12), rowheight=30, background="white")
@@ -90,46 +85,54 @@ def add_category_page(main):
     tree.pack(fill="both", expand=True)
 
 
-    # =================================================================
-    # ⚙️ LOGIC FUNCTIONS (ခလုတ်တွေမခေါ်ခင် ကြိုတင်ကြေညာထားခြင်း)
-    # =================================================================
+    # LOGIC FUNCTIONS
     
-    # 🔄 Database ထဲက Category များကို ဆွဲထုတ်ပြသမည့် Function
+    # Executing Categories From Database Function
     def load_categories():
         for item in tree.get_children():
             tree.delete(item)
         
-        with db() as conn:
+        conn = None
+        try:
+            conn = db()
             c = conn.cursor()
             c.execute("SELECT cat_name FROM categories ORDER BY cat_name ASC")
             rows = c.fetchall()
-            
+            for idx, row in enumerate(rows, 1):
+                tree.insert("", "end", values=(idx, row[0]))
+        except Exception as e:
+            messagebox.showerror("Database Error", f"Error loading categories: {e}")
+        finally:
+            if conn:
+                conn.close() # Connection ကို သေချာပေါက် ပြန်ပိတ်ပေးတယ်
 
-        for idx, row in enumerate(rows, 1):
-            tree.insert("", "end", values=(idx, row[0]))
-
-    # 💾 Category အသစ်ထည့်မည့် လုပ်ဆောင်ချက်
+    # Add New Category Function
     def save_category():
         cat_name = cat_entry.get().strip().capitalize()
         if not cat_name:
             messagebox.showwarning("Warning", "Please enter a category name!")
             return
 
+        conn = None
         try:
             conn = db()
             c = conn.cursor()
             c.execute("INSERT INTO categories (cat_name) VALUES (?)", (cat_name,))
             conn.commit()
-            conn.close()
             
             messagebox.showinfo("Success", f"'{cat_name}' added successfully!")
             cat_entry.delete(0, tk.END)
             load_categories()
             
-        except sqlite3.IntegrityError:  # sqlite3 သိုမဟုတ် db error စစ်ဆေးခြင်း
+        except sqlite3.IntegrityError:  # နာမည်တူရှိနေခဲ့ရင်
             messagebox.showerror("Error", "This category already exists!")
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {e}")
+        finally:
+            if conn:
+                conn.close() # Error တက်သည်ဖြစ်စေ၊ မတက်သည်ဖြစ်စေ database connection ကို အမြဲပိတ်ပေးဖို သေချာစေတယ်
 
-    # 🗑 Treeview ထဲက ရွေးထားတဲ့ Category ကို ဖျက်မည့် Function
+    # Deleting Chosen Category From Treeview Function
     def delete_category():
         selected = tree.focus()
         if not selected:
@@ -142,17 +145,22 @@ def add_category_page(main):
         confirm = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete Category '{cat_name_to_delete}'?\n(This might affect medicines under this category.)")
         
         if confirm:
-            conn = db()
-            c = conn.cursor()
-            c.execute("DELETE FROM categories WHERE cat_name=?", (cat_name_to_delete,))
-            conn.commit()
-            conn.close()
-            
-            messagebox.showinfo("Deleted", f"Category '{cat_name_to_delete}' deleted successfully!")
-            load_categories()
+            conn = None
+            try:
+                conn = db()
+                c = conn.cursor()
+                c.execute("DELETE FROM categories WHERE cat_name=?", (cat_name_to_delete,))
+                conn.commit()
+                messagebox.showinfo("Deleted", f"Category '{cat_name_to_delete}' deleted successfully!")
+                load_categories()
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not delete: {e}")
+            finally:
+                if conn:
+                    conn.close() # Connection ကို ပြန်ပိတ်ပေးတယ်
 
     
-    # ➕ ညာဘက်ခြမ်းအတွက် Delete Selected Button
+    # Right Delete Selected Button
     tk.Button(
         right_panel, 
         text="🗑 Delete Selected Category", 
@@ -163,7 +171,7 @@ def add_category_page(main):
         command=delete_category
     ).pack(side="bottom", anchor="center", padx=15, pady=(5, 15), ipady=3)
 
-    # ➕ ဘယ်ဘက်ခြမ်းအတွက် Add Category Button
+    # Left Add Category Button
     tk.Button(
         left_panel, 
         text="➕ Add Category", 
@@ -174,5 +182,5 @@ def add_category_page(main):
         command=save_category
     ).pack(fill="x", padx=20, pady=20, ipady=4)
 
-    # စာမျက်နှာပွင့်လာတာနဲ့ ညာဘက်ဇယားထဲ ဒေတာအလိုအလျောက်ဖြည့်ရန်
+    # pageပွင့်တာနဲ့ ညာဘက်ဇယားထဲ ဒေတာအလိုအလျောက်ဖြည့်
     load_categories()

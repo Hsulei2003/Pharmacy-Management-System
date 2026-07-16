@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+
 # ---------- STATUS CHECK ----------
 def get_status(expiry):
     try:
@@ -15,19 +16,20 @@ def get_status(expiry):
     else:
         return "Normal"
     
+
+ #------- Categories Function -------   
 def get_all_categories():
     from database import db
+
     conn = db()
     c = conn.cursor()
-    # Database ထဲက category နာမည်တွေကို ဆွဲထုတ်ခြင်း
     c.execute("SELECT cat_name FROM categories ORDER BY cat_name ASC")
     rows = c.fetchall()
     conn.close()
-    
-    # ရလာတဲ့ ဒေတာတွေကို list ပုံစံပြောင်းပစ်ခြင်း (ဥပမာ- ["💊 Capsule", "⚪️ Tablet"])
+    # ရလာတဲ့ ဒေတာတွေကို list ပုံစံပြောင်းပစ်ခြင်း 
     return [row[0] for row in rows]
 
-# 🌟 Supplier အသစ်သိမ်းရန် Function
+# ------ Saving Supplier ------
 def add_supplier_to_db(name, phone, email, address):
     from database import db
     try:
@@ -41,7 +43,7 @@ def add_supplier_to_db(name, phone, email, address):
         print(e)
         return False
     
-    # 🌟 Supplier အားလုံးကို ဆွဲထုတ်ရန် (Add Supplier Page ဇယားအတွက်)
+# Supplier Executing Function (For Add Supplier Page)
 def get_suppliers_list_details():
     from database import db
     conn = db()
@@ -51,7 +53,7 @@ def get_suppliers_list_details():
     conn.close()
     return rows
 
-# 🌟 Supplier အားလုံးကို Dropdown Combobox အတွက် ဆွဲထုတ်ပေးမည့် Function
+# Supplier Executing For Dropdown list Function
 def get_all_suppliers():
     from database import db
     conn = db()
@@ -61,7 +63,7 @@ def get_all_suppliers():
     conn.close()
     return [row[0] for row in rows]
 
-# 🌟 Supplier ဖျက်ရန် Function
+# Delete Supplier Function
 def delete_supplier_from_db(sup_id):
     from database import db
     try:
@@ -75,8 +77,7 @@ def delete_supplier_from_db(sup_id):
         print(e)
         return False
     
-    # 🌟 ၅။ ဆေးဝါးအသစ် (သိုမဟုတ်) Batch အသစ် သိမ်းဆည်းရန် Function
-# =====================================================================
+# To store new medicine or new batch Function
 def add_medicine_to_db(name, barcode, category, batch_number, qty, expiry, supplier):
     from database import db
     conn = db()
@@ -122,9 +123,7 @@ def add_medicine_to_db(name, barcode, category, batch_number, qty, expiry, suppl
         conn.close()
 
 
-# =====================================================================
-# 🌟 ၆။ ဆေးစာရင်းဇယား (Medicine List) အတွက် ဒေတာထုတ်ပေးမည့် Function
-# =====================================================================
+# (Medicine List)  Function
 def get_medicines_list_details():
     import datetime
     from database import db
@@ -133,9 +132,8 @@ def get_medicines_list_details():
     conn = db()
     c = conn.cursor()
     
-    # 🌟 ရှင်းလင်းချက် Query - 
-    # ၁။ စတော့ခ်ရှိသေးသော ဘတ်ချ်များထဲမှ အစောဆုံး သက်တမ်းကုန်မည့်ရက် (Nearest Expiry) ကို တွက်သည်။
-    # ၂။ အကယ်၍ စတော့ခ်အားလုံး 0 ဖြစ်နေပါက ရှိသမျှ ဘတ်ချ်ထဲမှ ရက်စွဲကို ယူပြီး Status ကို "No Stock" ဟု သတ်မှတ်သည်။
+    # stockရှိသေးသော batchများထဲမှ အစောဆုံး သက်တမ်းကုန်မည့်ရက် (Nearest Expiry) ကို တွက်သည်။
+    # အကယ်၍ stockအားလုံး 0 ဖြစ်နေပါက ရှိသမျှ batchထဲမှ ရက်စွဲကို ယူပြီး Status ကို "No Stock" ဟု သတ်မှတ်သည်။
     c.execute("""
         SELECT 
             m.id, 
@@ -143,12 +141,13 @@ def get_medicines_list_details():
             m.barcode, 
             m.category,
             COALESCE(SUM(b.qty), 0) as total_qty,
-            -- စတော့ခ်ကျန်သေးတဲ့ ဘတ်ချ်တွေရဲ့ သက်တမ်းကို ဦးစားပေးယူမည်၊ မရှိရင် အားလုံးထဲက အစောဆုံးရက်ကိုယူမည်
+            -- stockကျန်သေးတဲ့ batchတွေရဲ့ သက်တမ်းကို ဦးစားပေးယူမည်၊ မရှိရင် အားလုံးထဲက အစောဆုံးရက်ကိုယူမည်
             COALESCE(
                 MIN(CASE WHEN b.qty > 0 THEN b.expiry END), 
                 MIN(b.expiry)
             ) as nearest_expiry,
-            m.supplier
+            m.supplier,
+            m.unit_price
         FROM medicines m
         LEFT JOIN medicine_batches b ON m.id = b.medicine_id
         GROUP BY m.id
@@ -158,38 +157,36 @@ def get_medicines_list_details():
     
     final_details = []
     for row in rows:
-        med_id, name, barcode, category, total_qty, expiry, supplier = row
+        med_id, name, barcode, category, total_qty, expiry, supplier, unit_price = row
         
-        # သက်တမ်းကုန်ရက် မရှိခဲ့လျှင် (ဘတ်ချ် လုံးဝမသွင်းရသေးလျှင်)
+        # သက်တမ်းကုန်ရက် မရှိခဲ့လျှင် (batch လုံးဝမသွင်းရသေးလျှင်)
         if not expiry:
             expiry = "No Batch"
             status = "No Stock" if total_qty == 0 else "Normal"
         
-        # 🌟 စတော့ခ် လုံးဝမရှိတော့လျှင် Status ကို "No Stock" ဟု တန်းသတ်မှတ်မည်
+        # stock လုံးဝမရှိတော့လျှင် Status ကို "No Stock" ဟု တန်းသတ်မှတ်မည်
         elif total_qty == 0:
             status = "No Stock"
             
         else:
-            # စတော့ခ်ရှိသေးလျှင် လက်ရှိရက်စွဲနှင့် နှိင်းယှဉ်၍ အမှန်တကယ် အရောင်ပြောင်းမည်
+            # stockရှိသေးလျှင် လက်ရှိရက်စွဲနှင့် နှိင်းယှဉ်၍  အရောင်ပြောင်းမည်
             exp_date = datetime.datetime.strptime(expiry, "%Y-%m-%d").date()
             today = datetime.date.today()
             
             if exp_date < today:
                 status = "Expired"
-            elif (exp_date - today).days <= 7: # ၃၀ ရက်အတွင်းဆိုလျှင်
+            elif (exp_date - today).days <= 7: 
                 status = "Near Expiry"
             else:
                 status = "Normal"
                 
-        final_details.append((med_id, name, barcode, category, total_qty, expiry, supplier, status))
+        final_details.append((med_id, name, barcode, category, total_qty, expiry, supplier,unit_price, status))
         
     conn.close()
     return final_details
 
 
-# =====================================================================
-# 🌟 ၇။ ဆေးဝါးတစ်ခုလုံးကို ဖျက်ရန် Function (CASCADE ကြောင့် Batch တွေပါ အလိုအလျောက် ပျောက်သွားမည်)
-# =====================================================================
+# Delete Medicine Function (CASCADE ကြောင့် Batch တွေပါ အလိုအလျောက် ပျောက်မယ်)
 def delete_medicine_from_db(med_id):
     from database import db
     try:
