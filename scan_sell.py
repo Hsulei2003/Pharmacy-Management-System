@@ -18,7 +18,7 @@ def scan_page(main):
     ).pack(pady=15)
 
     card_width = 540
-    card_height = 630  # Cart ဆံ့အောင် Panel ကို အောက်သို ချဲ့ထားသည်
+    card_height = 630
 
     sell_card = tk.Canvas(main, width=card_width, height=card_height, bg="#f8f9fa", highlightthickness=0)
     sell_card.pack(pady=5)
@@ -71,7 +71,7 @@ def scan_page(main):
     def update_grand_total():
         total = 0
         for item in cart_tree.get_children():
-            total += int(cart_tree.item(item)['values'][4]) # Total Price က column index 4 မှာရှိသည်
+            total += int(cart_tree.item(item)['values'][4]) 
         lbl_total.config(text=f"Grand Total: {total:,} Ks")
 
     # --- Barcode Verification Logic ---
@@ -83,7 +83,6 @@ def scan_page(main):
             conn = db()
             c = conn.cursor()
             
-            # ဆေးဝါးအချက်အလက်နှင့် unit_price ကိုပါဆွဲထုတ်ခြင်း (မရှိလျှင် 0 ဟု ယူဆ)
             try:
                 c.execute("SELECT id, name, barcode, unit_price FROM medicines WHERE barcode=?", (code,))
                 med_info = c.fetchone()
@@ -112,7 +111,7 @@ def scan_page(main):
             med_id, name, barcode, unit_price = med_info
             if unit_price is None: unit_price = 0
 
-            # 🌟 [ပြင်ဆင်လိုက်သည်] သက်တမ်းမကုန်သေးဘဲ (expiry >= current_date) အမှန်တကယ်ရောင်းရမည့် Stock စုစုပေါင်းကိုပဲ တွက်ချက်ခြင်း
+            # သက်တမ်းမကုန်သေးဘဲ (expiry >= current_date) အမှန်တကယ်ရောင်းရမည့် Stock စုစုပေါင်းကိုပဲ တွက်ချက်ခြင်း
             c.execute("""
                 SELECT SUM(qty) FROM medicine_batches 
                 WHERE medicine_id = ? AND expiry >= ?
@@ -135,10 +134,9 @@ def scan_page(main):
 
                 icon_label.config(text=" ", font=("Segoe UI", 13), fg=text_color)
                 
-                # 🌟 ဒေတာဘေ့စ်ထဲမှ ဈေးနှုန်း format အမှားမတက်စေရန် ကော်မာသေချာဖြတ်ပြီး စာသားပုံစံ ပြင်ဆင်လိုက်ပါသည်
+                # ဒေတာဘေ့စ်ထဲမှ ဈေးနှုန်း format အမှားမတက်စေရန် ကော်မာသေချာဖြတ်ပြီး စာသားပုံစံ ပြင်ဆင်လိုက်ပါသည်
                 formatted_price = f"{int(unit_price):,}" if str(unit_price).isdigit() else str(unit_price)
 
-                # 🌟 လွဲမှားနေသော String Operator (|) ကို ဖယ်ရှားပြီး f-string တစ်ခုတည်းအဖြစ် စနစ်တကျ ပြောင်းလဲလိုက်ပါသည်
                 result.config(
                     text=f"{name}  |  Available Stock: {total_stock}  |\nNearest Exp: {active_expiry}  |  Price: {formatted_price} Ks",
                     font=("Segoe UI", 11, "bold"),
@@ -274,6 +272,76 @@ def scan_page(main):
         cart_tree.delete(selected)
         update_grand_total()
 
+        # --- RECEIPT / BILL PRINT WINDOW ---
+    def show_receipt_window(cart_items, total_amount):
+        import datetime
+        receipt_win = tk.Toplevel(main)
+        receipt_win.title("Sales Receipt")
+        receipt_win.geometry("380x550")
+        receipt_win.resizable(False, False)
+        receipt_win.config(bg="white")
+        receipt_win.grab_set() # Main window ကို ခဏ ပိတ်ထားမည်
+
+        # Header Area
+        tk.Label(receipt_win, text="PHARMACY POS SYSTEM", font=("Segoe UI", 14, "bold"), bg="white", fg="#2c3e50").pack(pady=(15, 2))
+        tk.Label(receipt_win, text="Official Cash Receipt", font=("Segoe UI", 10, "italic"), bg="white", fg="#7f8c8d").pack()
+        
+        date_str = datetime.datetime.now().strftime("%Y-%m-%d  %I:%M %p")
+        tk.Label(receipt_win, text=f"Date: {date_str}", font=("Segoe UI", 9), bg="white", fg="#34495e").pack(pady=(5, 10))
+
+        tk.Frame(receipt_win, height=1, width=340, bg="#bdc3c7").pack() # Divider Line
+
+        # Item List Table Frame
+        list_frame = tk.Frame(receipt_win, bg="white")
+        list_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+        # Header Row
+        tk.Label(list_frame, text="Item", font=("Segoe UI", 9, "bold"), bg="white", anchor="w").grid(row=0, column=0, sticky="w")
+        tk.Label(list_frame, text="Qty", font=("Segoe UI", 9, "bold"), bg="white", anchor="center").grid(row=0, column=1, padx=10)
+        tk.Label(list_frame, text="Price", font=("Segoe UI", 9, "bold"), bg="white", anchor="e").grid(row=0, column=2, sticky="e")
+        tk.Label(list_frame, text="Total", font=("Segoe UI", 9, "bold"), bg="white", anchor="e").grid(row=0, column=3, sticky="e")
+
+        list_frame.columnconfigure(0, weight=2)
+        list_frame.columnconfigure(3, weight=1)
+
+        # Populate Cart Items
+        row_idx = 1
+        for item in cart_items:
+            # item = (barcode, name, qty, price, total, med_id)
+            name = item[1]
+            qty = item[2]
+            price = f"{int(item[3]):,}"
+            subtotal = f"{int(item[4]):,}"
+
+            tk.Label(list_frame, text=name, font=("Segoe UI", 9), bg="white", anchor="w").grid(row=row_idx, column=0, sticky="w", pady=2)
+            tk.Label(list_frame, text=str(qty), font=("Segoe UI", 9), bg="white").grid(row=row_idx, column=1, pady=2)
+            tk.Label(list_frame, text=price, font=("Segoe UI", 9), bg="white", anchor="e").grid(row=row_idx, column=2, pady=2, padx=5)
+            tk.Label(list_frame, text=subtotal, font=("Segoe UI", 9), bg="white", anchor="e").grid(row=row_idx, column=3, sticky="e", pady=2)
+            row_idx += 1
+
+        # Grand Total Frame
+        tk.Frame(receipt_win, height=1, width=340, bg="#bdc3c7").pack()
+        
+        tot_frame = tk.Frame(receipt_win, bg="white")
+        tot_frame.pack(fill="x", padx=20, pady=10)
+        tk.Label(tot_frame, text="Grand Total:", font=("Segoe UI", 12, "bold"), bg="white", fg="#2c3e50").pack(side="left")
+        tk.Label(tot_frame, text=f"{total_amount:,} Ks", font=("Segoe UI", 13, "bold"), bg="white", fg="#27ae60").pack(side="right")
+
+        tk.Label(receipt_win, text="Thank you for shopping with us!", font=("Segoe UI", 9, "italic"), bg="white", fg="#7f8c8d").pack(pady=(0, 10))
+
+        # --- Direct Print Action ---
+        def print_action():
+            messagebox.showinfo("Print", "Sending document to printer...")
+            receipt_win.destroy()
+
+        # Separate Print Button
+        print_btn = tk.Button(
+            receipt_win, text="🖨️ Print Receipt", font=("Segoe UI", 10, "bold"), 
+            bg="#2980b9", fg="white", relief="flat", cursor="hand2", padx=20, pady=5,
+            command=print_action
+        )
+        print_btn.pack(pady=(0, 15))
+
     # --- Checkout / Checkout Done (FIFO Logic) ---
     def checkout():
         if not cart_tree.get_children():
@@ -294,8 +362,6 @@ def scan_page(main):
                 med_id = vals[5]
                 sell_qty = int(vals[2])
                 
-                # FIFO စနစ်အရ သက်တမ်းမကုန်သေးသော active batch များကို သက်တမ်းအလိုက် (expiry ASC) စီယူခြင်း
-                # 🌟 Expiry ရက်စွဲကိုပါ UPDATE မှာ သုံးနိုင်အောင် SQL Query ထဲတွင် expiry ကိုပါ ဆွဲထုတ်ခိုင်းလိုက်ပါတယ်
                 c.execute("""
                     SELECT qty, batch_number, expiry FROM medicine_batches 
                     WHERE medicine_id = ? AND qty > 0 AND expiry >= ?
@@ -305,11 +371,10 @@ def scan_page(main):
                 rem = sell_qty
 
                 for batch in batches:
-                    b_qty, b_no, b_exp = batch # 🌟 b_exp (expiry date) ကိုပါ variable ထဲ ထည့်ယူလိုက်ပါတယ်
+                    b_qty, b_no, b_exp = batch 
                     if rem <= 0: break
                     
                     if b_qty >= rem:
-                        # Batch နံပါတ် တူနေရင်တောင် Expiry ပါ ကိုက်ညီမှ နှုတ်ရန် AND expiry = ? ထည့်သွင်းထားပါတယ်
                         c.execute("""
                             UPDATE medicine_batches 
                             SET qty = qty - ? 
@@ -318,21 +383,30 @@ def scan_page(main):
                         rem = 0
                     else:
                         rem -= b_qty
-                        # 🌟 Batch နံပါတ် တူနေရင်တောင် Expiry ပါ ကိုက်ညီမှ 0 လုပ်ရန် AND expiry = ? ထည့်သွင်းထားပါတယ်
                         c.execute("""
                             UPDATE medicine_batches 
                             SET qty = 0 
                             WHERE medicine_id = ? AND batch_number = ? AND expiry = ?
-                        """, (med_id, b_no, b_exp))
+                        """, (rem, med_id, b_no, b_exp))
 
             conn.commit()
             conn.close()
-            messagebox.showinfo("Success", "Transaction Complete! Stock deducted from oldest batches.")
-            
-            # Reset Cart
-            for item in cart_tree.get_children(): cart_tree.delete(item)
+
+            # ၁။ Cart ထဲက ဒေတာများကို Receipt အတွက် ခဏသိမ်းဆည်းခြင်း
+            cart_data = [cart_tree.item(item)['values'] for item in cart_tree.get_children()]
+            grand_total = sum(int(item[4]) for item in cart_data)
+
+            # ၂။ Cart ကို သန့်ရှင်းရေးလုပ်ခြင်း (တစ်ကြိမ်တည်းသာ လုပ်ရပါမည်)
+            for item in cart_tree.get_children(): 
+                cart_tree.delete(item)
             update_grand_total()
             clear_inputs()
+            
+            # Stock နှုတ်ပြီးကြောင်း Cashier ကို အသိပေးခြင်း
+            messagebox.showinfo("Stock Updated", "Stock successfully deducted from the oldest active batch!")
+
+            # Receipt Window အား သီးသန့်ဖွင့်ပြပေးခြင်း
+            show_receipt_window(cart_data, grand_total)
 
         except Exception as e:
             messagebox.showerror("Database Error", f"Checkout failed:\n{e}")
@@ -365,10 +439,10 @@ def scan_page(main):
     cart_tree.column("price", width=80, anchor="e")
     cart_tree.column("total", width=90, anchor="e")
     cart_tree.column("med_id", width=0, minwidth=0, stretch=tk.NO) # Hidden ID column
-    # 🌟 Cart ထဲမှာ ဆေးအရမ်းများလာလျှင် အသုံးပြုရန် Scrollbar စနစ်
+    # Cart ထဲမှာ ဆေးအရမ်းများလာလျှင် အသုံးပြုရန် Scrollbar စနစ်
     scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=cart_tree.yview)
     cart_tree.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side="right", fill="y") # ညာဘက်ဘေးတွင် ကပ်ထားမည်
+    scrollbar.pack(side="right", fill="y")
     cart_tree.pack(fill="both", expand=True)
 
     # ===== LOWER FOOTER CONTROLS =====
@@ -378,5 +452,6 @@ def scan_page(main):
     remove_btn = tk.Button(sell_card, text="❌ Cancel Item", font=("Segoe UI", 10, "bold"), bg="#e67e22", fg="white", relief="flat", command=remove_item, cursor="hand2", padx=10)
     sell_card.create_window(468, 520, window=remove_btn, anchor="e")
 
-    checkout_btn = tk.Button(sell_card, text="🛍 Confirm Sell & Print Bill", font=("Segoe UI", 12, "bold"), bg="#2e7d32", fg="white", relief="flat", command=checkout, cursor="hand2", padx=40, pady=6)
+   # Confirm Sell ခလုတ် စာသားပြင်ရန်
+    checkout_btn = tk.Button(sell_card, text="💳 Confirm Sell", font=("Segoe UI", 12, "bold"), bg="#2e7d32", fg="white", relief="flat", command=checkout, cursor="hand2", padx=40, pady=6)
     sell_card.create_window(270, 580, window=checkout_btn, anchor="center")
