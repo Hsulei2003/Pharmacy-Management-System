@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from utils import clear
 from database import db
+from receipt import show_receipt
 
 def audit_log_page(main):
 
@@ -15,31 +16,19 @@ def audit_log_page(main):
     bg="#f8f9fa",
     fg="#2c3e50"
 ).pack(pady=15)
-    
-    search_frame = tk.Frame(main,bg="#f8f9fa")
-    search_frame.pack(fill="x",padx=20)
+
+    filter_frame = tk.Frame(main, bg="#f8f9fa")
+    filter_frame.pack(fill="x", padx=20, pady=(0,10))
 
     tk.Label(
-        search_frame,
-        text="Search",
-        bg="#f8f9fa"
+        filter_frame,
+        text="Action :",
+        bg="#f8f9fa",
+        font=("Segoe UI",10)
     ).pack(side="left")
 
-    search_entry = tk.Entry(
-        search_frame,
-        width=30
-    )
-
-    search_entry.pack(side="left",padx=10)
-
-    tk.Label(
-        search_frame,
-        text="Action",
-        bg="#f8f9fa"
-    ).pack(side="left", padx=(20,5))
-
     action_combo = ttk.Combobox(
-        search_frame,
+        filter_frame,
         values=[
             "Important",
             "All",
@@ -47,15 +36,15 @@ def audit_log_page(main):
             "LOGOUT",
             "CREATE",
             "UPDATE",
-            "DELETE"
+            "DELETE",
+            "SELL"
         ],
         state="readonly",
         width=15
     )
 
     action_combo.current(0)
-
-    action_combo.pack(side="left")
+    action_combo.pack(side="left", padx=10)
 
     table_frame = tk.Frame(main)
     table_frame.pack(
@@ -89,6 +78,7 @@ def audit_log_page(main):
     )
 
     columns = (
+        "ID",
         "Date",
         "Username",
         "Role",
@@ -107,6 +97,8 @@ def audit_log_page(main):
     for col in columns:
         tree.heading(col, text=col)
 
+    tree.heading("ID", text="")
+    tree.column("ID", width=0, minwidth=0, stretch=False)
     tree.column("Date", width=170)
     tree.column("Username", width=120)
     tree.column("Role", width=80)
@@ -135,7 +127,7 @@ def audit_log_page(main):
         fill="y"
     )
 
-    def load_logs(keyword="", action_filter="Important"):
+    def load_logs(action_filter="Important"):
 
         tree.delete(*tree.get_children())
 
@@ -146,6 +138,7 @@ def audit_log_page(main):
 
             c.execute("""
             SELECT
+                id,
                 created_at,
                 username,
                 role,
@@ -153,21 +146,22 @@ def audit_log_page(main):
                 module,
                 description
             FROM audit_logs
-            WHERE username LIKE ?
-            AND action IN
+            WHERE action IN
             (
                 'CREATE',
                 'UPDATE',
-                'DELETE'
+                'DELETE',
+                'SELL'
             )
             ORDER BY id DESC
             LIMIT 100
-            """,(f"%{keyword}%",))
+            """)
 
         elif action_filter == "All":
 
             c.execute("""
             SELECT
+                id,
                 created_at,
                 username,
                 role,
@@ -175,15 +169,15 @@ def audit_log_page(main):
                 module,
                 description
             FROM audit_logs
-            WHERE username LIKE ?
             ORDER BY id DESC
             LIMIT 100
-            """,(f"%{keyword}%",))
+            """)
 
         else:
 
             c.execute("""
             SELECT
+                id,
                 created_at,
                 username,
                 role,
@@ -191,15 +185,10 @@ def audit_log_page(main):
                 module,
                 description
             FROM audit_logs
-            WHERE username LIKE ?
-            AND action=?
+            WHERE action=?
             ORDER BY id DESC
             LIMIT 100
-            """,
-            (
-                f"%{keyword}%",
-                action_filter
-            ))
+            """, (action_filter,))
 
         rows = c.fetchall()
 
@@ -209,6 +198,7 @@ def audit_log_page(main):
                 "",
                 tk.END,
                 values=(
+                    "",
                     "",
                     "",
                     "",
@@ -228,10 +218,11 @@ def audit_log_page(main):
         tree.tag_configure("CREATE", foreground="#27ae60")
         tree.tag_configure("UPDATE", foreground="#f39c12")
         tree.tag_configure("DELETE", foreground="#e74c3c")
+        tree.tag_configure("SELL", foreground="#8e44ad")
 
         for row in rows:
 
-            created_at, username, role, action, module, description = row
+            id,created_at, username, role, action, module, description = row
 
             tree.insert(
                 "",
@@ -239,54 +230,52 @@ def audit_log_page(main):
                 values=row,
                 tags=(action,)
             )
-    
-    def search(event=None):
 
-        load_logs(
-            search_entry.get().strip(),
-            action_combo.get()
-        )
+    def open_receipt(event):
 
-    search_entry.bind(
-        "<KeyRelease>",
-        search
-    )
+        selected = tree.selection()
 
-    action_combo.bind(
-        "<<ComboboxSelected>>",
-        lambda e: load_logs(
-            search_entry.get().strip(),
-            action_combo.get()
-        )
-    )
+        if not selected:
+            return
 
-    load_logs(
-        "",
-        "Important"
-    )
+        values = tree.item(selected[0])["values"]
+
+        action = values[4]
+
+        if action != "SELL":
+            return
+
+        description = values[6]
+
+        if "Invoice :" not in description:
+            return
+
+        invoice_no = description.replace(
+            "Invoice :",
+            ""
+        ).strip()
+
+        show_receipt(invoice_no)
+
+    tree.bind("<Double-1>",open_receipt)
+    action_combo.bind("<<ComboboxSelected>>",lambda e: load_logs(action_combo.get()))
+    load_logs("Important")
 
     def auto_refresh():
 
         # Widget တွေရှိသေးလား စစ်
         if (
-            not search_entry.winfo_exists()
-            or not action_combo.winfo_exists()
-            or not tree.winfo_exists()
+             not tree.winfo_exists()
         ):
             return
         
         if (
             not main.winfo_exists()
-            or not search_entry.winfo_exists()
-            or not action_combo.winfo_exists()
             or not tree.winfo_exists()
         ):
             return
 
-        load_logs(
-            search_entry.get().strip(),
-            action_combo.get()
-        )
+        load_logs(action_combo.get())
 
         main.after(
             5000,

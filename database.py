@@ -1,5 +1,6 @@
 import sqlite3
 from authentication.security import hash_password
+from datetime import datetime
 
 def db():
     return sqlite3.connect("pharmacy.db", timeout=20)
@@ -16,7 +17,8 @@ def create_table():
         name TEXT NOT NULL,
         barcode TEXT NOT NULL UNIQUE,
         category TEXT,
-        supplier TEXT NOT NULL DEFAULT 'Unknown'
+        supplier TEXT NOT NULL DEFAULT 'Unknown',
+        unit_price INTEGER DEFAULT 0
     )
     """)
     
@@ -55,8 +57,33 @@ def create_table():
         action TEXT NOT NULL,
         module TEXT NOT NULL,
         description TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT (datetime('now','localtime')),
         FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+    """)
+
+    # Sales Header
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS sales(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invoice_no TEXT UNIQUE,
+        cashier TEXT,
+        sale_date TEXT,
+        grand_total INTEGER
+    )
+    """)
+
+    # Sales Items
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS sale_items(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sale_id INTEGER,
+        medicine_id INTEGER,
+        medicine_name TEXT,
+        qty INTEGER,
+        price INTEGER,
+        subtotal INTEGER,
+        FOREIGN KEY(sale_id) REFERENCES sales(id)
     )
     """)
 
@@ -78,6 +105,16 @@ def create_table():
         address TEXT
     )
     """)
+
+    # ===== Add unit_price column for old databases =====
+    c.execute("PRAGMA table_info(medicines)")
+    columns = [column[1] for column in c.fetchall()]
+
+    if "unit_price" not in columns:
+        c.execute("""
+            ALTER TABLE medicines
+            ADD COLUMN unit_price INTEGER NOT NULL DEFAULT 0
+        """)
     
     admin_hash = hash_password("admin123")
 
@@ -116,6 +153,8 @@ def log_action(
         conn = db()
         c = conn.cursor()
 
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
         c.execute("""
         INSERT INTO audit_logs
         (
@@ -124,10 +163,12 @@ def log_action(
             role,
             action,
             module,
-            description
+            description,
+            created_at
         )
         VALUES
         (
+            ?,
             ?,
             ?,
             ?,
@@ -142,7 +183,8 @@ def log_action(
             role,
             action,
             module,
-            description
+            description,
+            current_time
         ))
 
         conn.commit()

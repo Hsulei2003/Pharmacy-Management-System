@@ -296,10 +296,15 @@ def user_management_page(main):
     ).pack(side="left")
 
     search_entry = tk.Entry(
-        search_frame,
-        font=("Segoe UI", 11),
-        width=25
-    )
+    search_frame,
+    font=("Segoe UI", 11),
+    width=25,
+    relief="solid",
+    bd=1,
+    highlightthickness=1,
+    highlightbackground="#bdc3c7",
+    highlightcolor="#3498db"
+)
 
     search_entry.pack(side="left", padx=10)
     def search_user(event=None):
