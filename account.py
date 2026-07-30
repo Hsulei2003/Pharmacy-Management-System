@@ -1,7 +1,13 @@
 import tkinter as tk
 from tkinter import messagebox
-from database import db
+from database import db, log_action
 from utils import clear
+from authentication.security import (
+    verify_password,
+    hash_password,
+    validate_password
+)
+from authentication.session import get_current_user
 
 def account_page(main, user_id):
     clear(main)
@@ -67,13 +73,43 @@ def account_page(main, user_id):
         if new_pass != conf_pass:
             messagebox.showerror("Error", "New passwords do not match!")
             return
+        
+        valid, message = validate_password(new_pass)
+
+        if not valid:
+            messagebox.showerror(
+                "Weak Password",
+                message
+            )
+            return
 
         try:
+            current_user = get_current_user()
+
+            if current_user is None:
+                messagebox.showerror(
+                    "Error",
+                    "Please login again."
+                )
+                return
+
+            user_id = current_user["id"]
+
             conn = db()
             c = conn.cursor()
             
+<<<<<<< HEAD
             #လက်ရှိ user_id ရဲ့ Password ကို စစ်ဆေးပါတယ်
             c.execute("SELECT password FROM users WHERE id = ?", (user_id,))
+=======
+            # ဒေတာဘေ့စ်ထဲက လက်ရှိ (Admin ID: 1) ရဲ့ Password အဟောင်းကို လှမ်းယူစစ်ဆေးခြင်း
+            c.execute("""
+            SELECT password_hash
+            FROM users
+            WHERE id=?
+            """, (user_id,))
+
+>>>>>>> origin/king-receipt-update
             row = c.fetchone()
             
             if row is None:
@@ -81,6 +117,7 @@ def account_page(main, user_id):
                 conn.close()
                 return
                 
+<<<<<<< HEAD
             db_old_password = row[0]
             if old_pass != db_old_password:
                 messagebox.showerror("Error", "Incorrect Old Password! Authorization failed.")
@@ -89,10 +126,58 @@ def account_page(main, user_id):
             
             # လက်ရှိ user_id နေရာမှာပဲ သွားပြီး UPDATE လုပ်တယ်
             c.execute("UPDATE users SET username = ?, password = ? WHERE id = ?", (new_user, new_pass, user_id))
+=======
+            password_hash = row[0]
+            # 🌟 ရိုက်ထည့်လိုက်တဲ့ Old Password နဲ့ ဒေတာဘေ့စ်ထဲက Password ကိုက်ညီမှု ရှိမရှိ စစ်ဆေးခြင်း
+            # (မှတ်ချက် - အကယ်၍ မိတ်ဆွေက login မှာ password ကို hash လုပ်သုံးထားရင် ဒီနေရာမှာလည်း old_pass ကို hash လုပ်ပြီးမှ တိုက်စစ်ပေးရပါမယ်ဗျာ)
+            if not verify_password(
+                old_pass,
+                password_hash
+            ):
+                messagebox.showerror(
+                    "Error",
+                    "Incorrect Old Password!"
+                )
+                conn.close()
+                return
+            
+            # အဟောင်းမှန်ကန်မှသာ အသစ်ကို UPDATE လုပ်ခွင့်ပေးမည်
+            new_password_hash = hash_password(new_pass)
+
+            c.execute("""
+            UPDATE users
+            SET
+                username=?,
+                password_hash=?
+            WHERE id=?
+            """,
+            (
+                new_user,
+                new_password_hash,
+                user_id
+            ))
+>>>>>>> origin/king-receipt-update
             conn.commit()
             conn.close()
 
+            log_action(
+                user_id,
+                new_user,
+                current_user["role"],
+                "UPDATE",
+                "Account",
+                "Updated own account"
+            )
+
             messagebox.showinfo("Success", "Account updated successfully!\nPlease use new credentials next time.")
+
+            from authentication.session import login
+
+            login({
+                "id": user_id,
+                "username": new_user,
+                "role": current_user["role"]
+            })
             
             old_pass_entry.delete(0, tk.END)
             user_entry.delete(0, tk.END)

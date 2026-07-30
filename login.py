@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox
-from database import db
+from database import db, log_action
+from authentication.security import verify_password
+from authentication.session import login
 
 class LoginWindow:
     def __init__(self, on_success):
@@ -85,16 +87,68 @@ class LoginWindow:
         try:
             conn = db()
             c = conn.cursor()
-            c.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
+            c.execute("""
+            SELECT
+                id,
+                username,
+                password_hash,
+                role
+            FROM users
+            WHERE username=?
+            """, (username,))
+
             user = c.fetchone()
+
             conn.close()
 
+<<<<<<< HEAD
             if user:
                 current_user_id = user[0] #ရလာတဲ့ User ID (ဥပမာ- 1) ကို မှတ်လိုက်တယ်
                 self.root.destroy()
                 self.on_success(current_user_id) #Main app ဆီကို ID ပို့လိုက်တယ်
+=======
+            if user is None:
+                messagebox.showerror(
+                    "Login Failed",
+                    "Incorrect Username or Password!"
+                )
+                return
+
+            user_id, db_username, password_hash, role = user
+
+            if not password_hash:
+                messagebox.showerror(
+                    "Database Error",
+                    "Password hash is missing."
+                )
+                return
+
+            if verify_password(password, password_hash):
+
+                login({
+                    "id": user_id,
+                    "username": db_username,
+                    "role": role
+                })
+
+                log_action(
+                    user_id,
+                    db_username,
+                    role,
+                    "LOGIN",
+                    "Authentication",
+                    "User logged in"
+                )
+
+                self.root.destroy()
+                self.on_success()
+
+>>>>>>> origin/king-receipt-update
             else:
-                messagebox.showerror("Error", "Incorrect Username or Password!")
+                messagebox.showerror(
+                    "Login Failed",
+                    "Incorrect Username or Password!"
+                )
                 
         except Exception as e:
             messagebox.showerror("Database Error", f"Error: {str(e)}")

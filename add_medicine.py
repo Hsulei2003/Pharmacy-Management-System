@@ -1,10 +1,18 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
+<<<<<<< HEAD
 from database import db 
 from utils import clear
 from logic import get_all_categories, get_all_suppliers
 from medicine_list import list_page
+=======
+from database import db, log_action
+from utils import clear
+from logic import get_all_categories, get_all_suppliers
+from medicine_list import list_page
+from authentication.session import get_current_user
+>>>>>>> origin/king-receipt-update
 
 # ---------- ADD MEDICINE PAGE ----------
 def add_page(main):
@@ -317,7 +325,27 @@ def add_page(main):
                         VALUES (?, ?, ?, ?)
                     """, (med_id, batch_val, qty_val, expiry_val))
                     conn.commit()
+<<<<<<< HEAD
                     messagebox.showinfo("Success", f"New batch ({batch_val}) added and price updated for existing medicine '{name_val}'.")
+=======
+
+                    user = get_current_user()
+
+                    if user:
+                        log_action(
+                            user["id"],
+                            user["username"],
+                            user["role"],
+                            "UPDATE",
+                            "Medicine",
+                            f'Added batch "{batch_val}" and updated "{name_val}"'
+                        )
+
+                    messagebox.showinfo(
+                        "Success",
+                        f"New batch ({batch_val}) added and price updated for existing medicine '{name_val}'."
+                    )
+>>>>>>> origin/king-receipt-update
 
             else:
                 # 🌟 Barcode အသစ်ဆိုလျှင် ဆေးအသစ်ရော (unit_price အပါအဝင်)၊ Batch အသစ်ရော သွင်းမည်
@@ -333,7 +361,23 @@ def add_page(main):
                     VALUES (?, ?, ?, ?)
                 """, (new_med_id, batch_val, qty_val, expiry_val))
                 conn.commit()
-                messagebox.showinfo("Success", f"Successfully added new medicine '{name_val}'!")
+
+                user = get_current_user()
+
+                if user:
+                    log_action(
+                        user["id"],
+                        user["username"],
+                        user["role"],
+                        "CREATE",
+                        "Medicine",
+                        f'Added medicine "{name_val}"'
+                    )
+
+                messagebox.showinfo(
+                    "Success",
+                    f"Successfully added new medicine '{name_val}'!"
+                )
 
             conn.close()
             list_page(main, focus_barcode=barcode_val)

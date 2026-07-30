@@ -216,8 +216,12 @@ def dashboard(main):
 
     # =====  AUTO BACKGROUND SCAN & BATCH UI CARD GENERATOR =====
     def auto_scan():
-        if not exp_scroll_frame.winfo_exists() or not near_scroll_frame.winfo_exists():
-            return 
+        if (
+            not main.winfo_exists()
+            or not exp_scroll_frame.winfo_exists()
+            or not near_scroll_frame.winfo_exists()
+        ):
+            return
         try:
             conn = db()
             c = conn.cursor()
@@ -303,10 +307,11 @@ def dashboard(main):
         except Exception as e:
             pass
 
-        try:
-            if exp_scroll_frame.winfo_exists() and near_scroll_frame.winfo_exists():
-                main.after(30000, auto_scan)
-        except:
-            pass
+        if (
+            main.winfo_exists()
+            and exp_scroll_frame.winfo_exists()
+            and near_scroll_frame.winfo_exists()
+        ):
+            main.after(30000, auto_scan)
 
-    auto_scan()
+    main.after(30000, auto_scan)

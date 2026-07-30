@@ -77,8 +77,14 @@ def delete_supplier_from_db(sup_id):
         print(e)
         return False
     
+<<<<<<< HEAD
 # To store new medicine or new batch Function
 def add_medicine_to_db(name, barcode, category, batch_number, qty, expiry, supplier):
+=======
+    # 🌟 ၅။ ဆေးဝါးအသစ် (သိုမဟုတ်) Batch အသစ် သိမ်းဆည်းရန် Function
+# =====================================================================
+def add_medicine_to_db(name, barcode, category, batch_number, qty, expiry, supplier, unit_price):
+>>>>>>> origin/king-receipt-update
     from database import db
     conn = db()
     c = conn.cursor()
@@ -95,14 +101,14 @@ def add_medicine_to_db(name, barcode, category, batch_number, qty, expiry, suppl
             # ရှိပြီးသားဆေးဖြစ်တဲ့အတွက် နာမည်နဲ့ supplier တူရင် ထပ်မပြင်ချင်ပေမယ့် 
             # ပြောင်းလဲခဲ့ရင် အဆင်ပြေအောင် ဆေးအချက်အလက်ကို UPDATE လုပ်ပေးနိုင်ပါတယ် (Optional)
             c.execute(
-                "UPDATE medicines SET name=?, category=?, supplier=? WHERE id=?",
-                (name, category, supplier, medicine_id)
+                "UPDATE medicines SET name=?, category=?, supplier=?, unit_price=? WHERE id=?",
+                (name, category, supplier, unit_price, medicine_id)
             )
         else:
             # မရှိသေးဘူးဆိုရင် ဆေးအသစ်အနေနဲ့ medicines table ထဲကို အရင် INSERT လုပ်မယ်
             c.execute(
-                "INSERT INTO medicines (name, barcode, category, supplier) VALUES (?, ?, ?, ?)",
-                (name, barcode, category, supplier)
+                "INSERT INTO medicines (name, barcode, category, supplier, unit_price) VALUES (?, ?, ?, ?, ?)",
+                (name, barcode, category, supplier, unit_price)
             )
             # ခုနကမှ အသစ်ဝင်သွားတဲ့ ဆေးရဲ့ Auto-increment ID ကို လှမ်းယူခြင်း
             medicine_id = c.lastrowid
@@ -180,7 +186,11 @@ def get_medicines_list_details():
             else:
                 status = "Normal"
                 
+<<<<<<< HEAD
         final_details.append((med_id, name, barcode, category, total_qty, expiry, supplier,unit_price, status))
+=======
+        final_details.append((med_id, name, barcode, category, total_qty, expiry, supplier, unit_price, status))
+>>>>>>> origin/king-receipt-update
         
     conn.close()
     return final_details

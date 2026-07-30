@@ -1,7 +1,12 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import datetime
+<<<<<<< HEAD
 from database import db
+=======
+from database import db, log_action
+from authentication.session import get_current_user
+>>>>>>> origin/king-receipt-update
 from utils import clear
 from logic import get_status, get_all_categories, get_all_suppliers, get_medicines_list_details, delete_medicine_from_db
 
@@ -154,7 +159,11 @@ def list_page(main, focus_barcode=None):
             # Inserting into Treeview 
             item_id = tree.insert(
                 "", "end", 
+<<<<<<< HEAD
                 values=(med_id, name, barcode, category, qty, f"{unit_price:,}Ks" if unit_price is not None else "0 ks", expiry, supplier_val, status), 
+=======
+                values=(med_id, name, barcode, category, qty, f"{unit_price:,} Ks" if unit_price is not None else "0 ks", expiry, supplier_val, status), 
+>>>>>>> origin/king-receipt-update
                 tags=(status,)
             )
             # အသစ်သွင်းပြီး ပြန်လာပါက တန်းရွေးပေးထားရန်
@@ -263,6 +272,17 @@ def list_page(main, focus_barcode=None):
                           WHERE id=?
                 """, (name_val, cat_val, supplier_val, int(price_val), med_id))
                 conn.commit()
+                user = get_current_user()
+
+                if user:
+                    log_action(
+                        user["id"],
+                        user["username"],
+                        user["role"],
+                        "UPDATE",
+                        "Medicine",
+                        f'Updated medicine "{name_val}"'
+                    )
                 conn.close()
                 
                 messagebox.showinfo("Success", "Medicine details & price updated successfully!")
@@ -295,6 +315,17 @@ def list_page(main, focus_barcode=None):
         )
         if confirm:
             if delete_medicine_from_db(med_id):
+                user = get_current_user()
+
+                if user:
+                    log_action(
+                        user["id"],
+                        user["username"],
+                        user["role"],
+                        "DELETE",
+                        "Medicine",
+                        f'Deleted medicine "{med_name}"'
+                    )
                 messagebox.showinfo("Deleted", f"'{med_name}' and its batch items deleted successfully!")
                 load()
             else:

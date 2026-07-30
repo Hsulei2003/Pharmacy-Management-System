@@ -104,7 +104,7 @@ def add_category_page(main):
             messagebox.showerror("Database Error", f"Error loading categories: {e}")
         finally:
             if conn:
-                conn.close() # Connection ကို သေချာပေါက် ပြန်ပိတ်ပေးတယ်
+                conn.close() 
 
     # Add New Category Function
     def save_category():
@@ -130,7 +130,7 @@ def add_category_page(main):
             messagebox.showerror("Error", f"An error occurred: {e}")
         finally:
             if conn:
-                conn.close() # Error တက်သည်ဖြစ်စေ၊ မတက်သည်ဖြစ်စေ database connection ကို အမြဲပိတ်ပေးဖို သေချာစေတယ်
+                conn.close() 
 
     # Deleting Chosen Category From Treeview Function
     def delete_category():
@@ -157,7 +157,7 @@ def add_category_page(main):
                 messagebox.showerror("Error", f"Could not delete: {e}")
             finally:
                 if conn:
-                    conn.close() # Connection ကို ပြန်ပိတ်ပေးတယ်
+                    conn.close()
 
     
     # Right Delete Selected Button

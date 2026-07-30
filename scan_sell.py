@@ -1,8 +1,10 @@
 import tkinter as tk
-from database import db
+from database import db, log_action
+from authentication.session import get_current_user
 from tkinter import ttk, messagebox
 from logic import get_status
 from utils import clear
+from receipt import show_receipt
 
 # ---------- SCAN + SELL (POS VERSION) ----------
 def scan_page(main):
@@ -18,7 +20,11 @@ def scan_page(main):
     ).pack(pady=15)
 
     card_width = 540
+<<<<<<< HEAD
     card_height = 630
+=======
+    card_height = 630  # Cart ဆံ့အောင် Panel ကို အောက်သို ချဲ့ထားသည်
+>>>>>>> origin/king-receipt-update
 
     sell_card = tk.Canvas(main, width=card_width, height=card_height, bg="#f8f9fa", highlightthickness=0)
     sell_card.pack(pady=5)
@@ -71,7 +77,11 @@ def scan_page(main):
     def update_grand_total():
         total = 0
         for item in cart_tree.get_children():
+<<<<<<< HEAD
             total += int(cart_tree.item(item)['values'][4]) 
+=======
+            total += int(cart_tree.item(item)['values'][4]) # Total Price က column index 4 မှာရှိသည်
+>>>>>>> origin/king-receipt-update
         lbl_total.config(text=f"Grand Total: {total:,} Ks")
 
     # --- Barcode Verification Logic ---
@@ -83,6 +93,10 @@ def scan_page(main):
             conn = db()
             c = conn.cursor()
             
+<<<<<<< HEAD
+=======
+            # ဆေးဝါးအချက်အလက်နှင့် unit_price ကိုပါဆွဲထုတ်ခြင်း (မရှိလျှင် 0 ဟု ယူဆ)
+>>>>>>> origin/king-receipt-update
             try:
                 c.execute("SELECT id, name, barcode, unit_price FROM medicines WHERE barcode=?", (code,))
                 med_info = c.fetchone()
@@ -111,7 +125,11 @@ def scan_page(main):
             med_id, name, barcode, unit_price = med_info
             if unit_price is None: unit_price = 0
 
+<<<<<<< HEAD
             # သက်တမ်းမကုန်သေးဘဲ (expiry >= current_date) အမှန်တကယ်ရောင်းရမည့် Stock စုစုပေါင်းကိုပဲ တွက်ချက်ခြင်း
+=======
+            # 🌟 [ပြင်ဆင်လိုက်သည်] သက်တမ်းမကုန်သေးဘဲ (expiry >= current_date) အမှန်တကယ်ရောင်းရမည့် Stock စုစုပေါင်းကိုပဲ တွက်ချက်ခြင်း
+>>>>>>> origin/king-receipt-update
             c.execute("""
                 SELECT SUM(qty) FROM medicine_batches 
                 WHERE medicine_id = ? AND expiry >= ?
@@ -134,9 +152,16 @@ def scan_page(main):
 
                 icon_label.config(text=" ", font=("Segoe UI", 13), fg=text_color)
                 
+<<<<<<< HEAD
                 # ဒေတာဘေ့စ်ထဲမှ ဈေးနှုန်း format အမှားမတက်စေရန် ကော်မာသေချာဖြတ်ပြီး စာသားပုံစံ ပြင်ဆင်လိုက်ပါသည်
                 formatted_price = f"{int(unit_price):,}" if str(unit_price).isdigit() else str(unit_price)
 
+=======
+                # 🌟 ဒေတာဘေ့စ်ထဲမှ ဈေးနှုန်း format အမှားမတက်စေရန် ကော်မာသေချာဖြတ်ပြီး စာသားပုံစံ ပြင်ဆင်လိုက်ပါသည်
+                formatted_price = f"{int(unit_price):,}" if str(unit_price).isdigit() else str(unit_price)
+
+                # 🌟 လွဲမှားနေသော String Operator (|) ကို ဖယ်ရှားပြီး f-string တစ်ခုတည်းအဖြစ် စနစ်တကျ ပြောင်းလဲလိုက်ပါသည်
+>>>>>>> origin/king-receipt-update
                 result.config(
                     text=f"{name}  |  Available Stock: {total_stock}  |\nNearest Exp: {active_expiry}  |  Price: {formatted_price} Ks",
                     font=("Segoe UI", 11, "bold"),
@@ -272,6 +297,7 @@ def scan_page(main):
         cart_tree.delete(selected)
         update_grand_total()
 
+<<<<<<< HEAD
         # --- RECEIPT / BILL PRINT WINDOW ---
     def show_receipt_window(cart_items, total_amount):
         import datetime
@@ -342,6 +368,8 @@ def scan_page(main):
         )
         print_btn.pack(pady=(0, 15))
 
+=======
+>>>>>>> origin/king-receipt-update
     # --- Checkout / Checkout Done (FIFO Logic) ---
     def checkout():
         if not cart_tree.get_children():
@@ -357,11 +385,28 @@ def scan_page(main):
             conn = db()
             c = conn.cursor()
 
+<<<<<<< HEAD
+=======
+            import datetime
+
+            invoice_no = "INV" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            sale_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            grand_total = 0
+            for item in cart_tree.get_children():
+                grand_total += int(cart_tree.item(item)["values"][4])
+
+>>>>>>> origin/king-receipt-update
             for item in cart_tree.get_children():
                 vals = cart_tree.item(item)['values']
                 med_id = vals[5]
                 sell_qty = int(vals[2])
                 
+<<<<<<< HEAD
+=======
+                # FIFO စနစ်အရ သက်တမ်းမကုန်သေးသော active batch များကို သက်တမ်းအလိုက် (expiry ASC) စီယူခြင်း
+                # 🌟 Expiry ရက်စွဲကိုပါ UPDATE မှာ သုံးနိုင်အောင် SQL Query ထဲတွင် expiry ကိုပါ ဆွဲထုတ်ခိုင်းလိုက်ပါတယ်
+>>>>>>> origin/king-receipt-update
                 c.execute("""
                     SELECT qty, batch_number, expiry FROM medicine_batches 
                     WHERE medicine_id = ? AND qty > 0 AND expiry >= ?
@@ -371,10 +416,18 @@ def scan_page(main):
                 rem = sell_qty
 
                 for batch in batches:
+<<<<<<< HEAD
                     b_qty, b_no, b_exp = batch 
                     if rem <= 0: break
                     
                     if b_qty >= rem:
+=======
+                    b_qty, b_no, b_exp = batch # 🌟 b_exp (expiry date) ကိုပါ variable ထဲ ထည့်ယူလိုက်ပါတယ်
+                    if rem <= 0: break
+                    
+                    if b_qty >= rem:
+                        # Batch နံပါတ် တူနေရင်တောင် Expiry ပါ ကိုက်ညီမှ နှုတ်ရန် AND expiry = ? ထည့်သွင်းထားပါတယ်
+>>>>>>> origin/king-receipt-update
                         c.execute("""
                             UPDATE medicine_batches 
                             SET qty = qty - ? 
@@ -383,10 +436,15 @@ def scan_page(main):
                         rem = 0
                     else:
                         rem -= b_qty
+<<<<<<< HEAD
+=======
+                        # 🌟 Batch နံပါတ် တူနေရင်တောင် Expiry ပါ ကိုက်ညီမှ 0 လုပ်ရန် AND expiry = ? ထည့်သွင်းထားပါတယ်
+>>>>>>> origin/king-receipt-update
                         c.execute("""
                             UPDATE medicine_batches 
                             SET qty = 0 
                             WHERE medicine_id = ? AND batch_number = ? AND expiry = ?
+<<<<<<< HEAD
                         """, (rem, med_id, b_no, b_exp))
 
             conn.commit()
@@ -407,6 +465,105 @@ def scan_page(main):
 
             # Receipt Window အား သီးသန့်ဖွင့်ပြပေးခြင်း
             show_receipt_window(cart_data, grand_total)
+=======
+                        """, (med_id, b_no, b_exp))
+
+            # -----------------------------
+            # Save Sale Header
+            # -----------------------------
+            user = get_current_user()
+
+            cashier = user["username"] if user else "Unknown"
+
+            c.execute("""
+            INSERT INTO sales
+            (
+                invoice_no,
+                cashier,
+                sale_date,
+                grand_total
+            )
+            VALUES
+            (
+                ?,
+                ?,
+                ?,
+                ?
+            )
+            """,
+            (
+                invoice_no,
+                cashier,
+                sale_date,
+                grand_total
+            ))
+
+            sale_id = c.lastrowid
+
+            # -----------------------------
+            # Save Sale Items
+            # -----------------------------
+            for item in cart_tree.get_children():
+
+                vals = cart_tree.item(item)["values"]
+
+                c.execute("""
+                INSERT INTO sale_items
+                (
+                    sale_id,
+                    medicine_id,
+                    medicine_name,
+                    qty,
+                    price,
+                    subtotal
+                )
+                VALUES
+                (
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    ?
+                )
+                """,
+                (
+                    sale_id,
+                    vals[5],
+                    vals[1],
+                    vals[2],
+                    vals[3],
+                    vals[4]
+                ))            
+
+            conn.commit()
+            user = get_current_user()
+
+            if user:
+                log_action(
+                    user["id"],
+                    user["username"],
+                    user["role"],
+                    "SELL",
+                    "POS",
+                    f"Invoice : {invoice_no}"
+                )
+            conn.close()
+
+            show_receipt(invoice_no)
+
+            # Reset Cart
+            for item in cart_tree.get_children():
+                cart_tree.delete(item)
+
+            update_grand_total()
+            clear_inputs()
+            
+            # Reset Cart
+            for item in cart_tree.get_children(): cart_tree.delete(item)
+            update_grand_total()
+            clear_inputs()
+>>>>>>> origin/king-receipt-update
 
         except Exception as e:
             messagebox.showerror("Database Error", f"Checkout failed:\n{e}")
@@ -439,10 +596,17 @@ def scan_page(main):
     cart_tree.column("price", width=80, anchor="e")
     cart_tree.column("total", width=90, anchor="e")
     cart_tree.column("med_id", width=0, minwidth=0, stretch=tk.NO) # Hidden ID column
+<<<<<<< HEAD
     # Cart ထဲမှာ ဆေးအရမ်းများလာလျှင် အသုံးပြုရန် Scrollbar စနစ်
     scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=cart_tree.yview)
     cart_tree.configure(yscrollcommand=scrollbar.set)
     scrollbar.pack(side="right", fill="y")
+=======
+    # 🌟 Cart ထဲမှာ ဆေးအရမ်းများလာလျှင် အသုံးပြုရန် Scrollbar စနစ်
+    scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=cart_tree.yview)
+    cart_tree.configure(yscrollcommand=scrollbar.set)
+    scrollbar.pack(side="right", fill="y") # ညာဘက်ဘေးတွင် ကပ်ထားမည်
+>>>>>>> origin/king-receipt-update
     cart_tree.pack(fill="both", expand=True)
 
     # ===== LOWER FOOTER CONTROLS =====
@@ -452,6 +616,10 @@ def scan_page(main):
     remove_btn = tk.Button(sell_card, text="❌ Cancel Item", font=("Segoe UI", 10, "bold"), bg="#e67e22", fg="white", relief="flat", command=remove_item, cursor="hand2", padx=10)
     sell_card.create_window(468, 520, window=remove_btn, anchor="e")
 
+<<<<<<< HEAD
    # Confirm Sell ခလုတ် စာသားပြင်ရန်
     checkout_btn = tk.Button(sell_card, text="💳 Confirm Sell", font=("Segoe UI", 12, "bold"), bg="#2e7d32", fg="white", relief="flat", command=checkout, cursor="hand2", padx=40, pady=6)
+=======
+    checkout_btn = tk.Button(sell_card, text="🛍 Confirm Sell & Print Bill", font=("Segoe UI", 12, "bold"), bg="#2e7d32", fg="white", relief="flat", command=checkout, cursor="hand2", padx=40, pady=6)
+>>>>>>> origin/king-receipt-update
     sell_card.create_window(270, 580, window=checkout_btn, anchor="center")
